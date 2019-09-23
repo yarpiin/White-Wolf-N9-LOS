@@ -22,14 +22,14 @@ TOOLCHAIN_DIR="/home/yarpiin/Android/Toolchains"
 
 # Kernel Details
 BASE_YARPIIN_VER="WHITE.WOLF.N9.LOS16"
-VER=".007"
+VER=".008"
 PERM=".PERM"
 YARPIIN_VER="$BASE_YARPIIN_VER$VER"
 YARPIIN_PERM_VER="$BASE_YARPIIN_VER$VER$PERM"
 
 # Vars
 export LOCALVERSION=-`echo $YARPIIN_VER`
-export CROSS_COMPILE="$TOOLCHAIN_DIR/aarch64-linux-gnu/bin/aarch64-linux-gnu-"
+export CROSS_COMPILE="$TOOLCHAIN_DIR/aarch64-elf-gcc/bin/aarch64-elf-"
 export ARCH=arm64
 export SUBARCH=arm64
 export KBUILD_BUILD_USER=yarpiin
