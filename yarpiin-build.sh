@@ -36,10 +36,10 @@ export KBUILD_BUILD_USER=yarpiin
 export KBUILD_BUILD_HOST=kernel
 
 # Paths
-CROWNREPACK_DIR="/home/yarpiin/Android/Kernel/SGS9/LosRepack/N960/split_img"
-AOSPCROWNREPACK_DIR="/home/yarpiin/Android/Kernel/SGS9/AOSPRepack/N960/split_img"
-CROWNIMG_DIR="/home/yarpiin/Android/Kernel/SGS9/LosRepack/N960"
-AOSPCROWNIMG_DIR="/home/yarpiin/Android/Kernel/SGS9/AOSPRepack/N960"
+CROWNREPACK_DIR="/home/yarpiin/Android/Kernel/SGS9/LosQRepack/N960/split_img"
+AOSPCROWNREPACK_DIR="/home/yarpiin/Android/Kernel/SGS9/AOSPQRepack/N960/split_img"
+CROWNIMG_DIR="/home/yarpiin/Android/Kernel/SGS9/LosQRepack/N960"
+AOSPCROWNIMG_DIR="/home/yarpiin/Android/Kernel/SGS9/AOSPQRepack/N960"
 ZIP_MOVE="/home/yarpiin/Android/Kernel/SGS9/Zip"
 ZIMAGE_DIR="$KERNEL_DIR/arch/arm64/boot"
 
@@ -75,14 +75,14 @@ function make_crown_permissive_kernel {
 }
 
 function repack_crown {
-		/bin/bash /home/yarpiin/Android/Kernel/SGS9/LosRepack/N960/repackimg.sh
+		/bin/bash /home/yarpiin/Android/Kernel/SGS9/LosQRepack/N960/repackimg.sh
 		cd $CROWNIMG_DIR
 		cp -vr image-new.img $KERNELFLASHER_DIR/N960.img
 		cd $KERNEL_DIR
 }
 
 function aosp_repack_crown {
-		/bin/bash /home/yarpiin/Android/Kernel/SGS9/AOSPRepack/N960/repackimg.sh
+		/bin/bash /home/yarpiin/Android/Kernel/SGS9/AOSPQRepack/N960/repackimg.sh
 		cd $AOSPCROWNIMG_DIR
 		cp -vr image-new.img $AOSPKERNELFLASHER_DIR/N960.img
 		cd $KERNEL_DIR
