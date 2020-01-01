@@ -81,7 +81,7 @@ static int rome_patch_ver_req(struct hci_dev *hdev, u32 *rome_version)
 	 * and lower 2 bytes from patch will be used.
 	 */
 	*rome_version = (le32_to_cpu(ver->soc_id) << 16) |
-		        (le16_to_cpu(ver->rome_ver) & 0x0000ffff);
+			(le16_to_cpu(ver->rome_ver) & 0x0000ffff);
 
 out:
 	kfree_skb(skb);
@@ -362,9 +362,6 @@ int qca_uart_setup_rome(struct hci_dev *hdev, uint8_t baudrate)
 		BT_ERR("%s: Failed to download patch (%d)", hdev->name, err);
 		return err;
 	}
-
-	/* Give the controller some time to get ready to receive the NVM */
-	msleep(10);
 
 	/* Download NVM configuration */
 	config.type = TLV_TYPE_NVM;
