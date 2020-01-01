@@ -57,7 +57,7 @@
 #define SPI_DEFAULT_SPEED 6500000L
 
 /* size of maximum read/write buffer supported by driver */
-#define MAX_BUFFER_SIZE   259U
+#define MAX_BUFFER_SIZE   260U
 
 /* Different driver debug lever */
 enum P3_DEBUG_LEVEL {
@@ -103,6 +103,7 @@ struct p3_data {
 	int cs_gpio;
 	unsigned long speed;
 	const char *vdd_1p8;
+	int vdd_1p8_gpio;
 #ifdef CONFIG_ESE_SECURE
 	struct clk *ese_spi_pclk;
 	struct clk *ese_spi_sclk;
@@ -110,22 +111,24 @@ struct p3_data {
 };
 
 #ifndef CONFIG_ESE_SECURE
-static void p3_pinctrl_config(struct device *dev, bool onoff)
+static void p3_pinctrl_config(struct p3_data *data, bool onoff)
 {
+	struct spi_device *spi = data->spi;
+	struct device *spi_dev = spi->dev.parent->parent;
 	struct pinctrl *pinctrl = NULL;
 
 	P3_INFO_MSG("%s: pinctrol - %s\n", __func__, onoff ? "on" : "off");
 
 	if (onoff) {
 		/* ON */
-		pinctrl = devm_pinctrl_get_select(dev, "ese_active");
+		pinctrl = devm_pinctrl_get_select(spi_dev, "ese_active");
 		if (IS_ERR_OR_NULL(pinctrl))
 			P3_ERR_MSG("%s: Failed to configure ese pin\n", __func__);
 		else
 			devm_pinctrl_put(pinctrl);
 	} else {
 		/* OFF */
-		pinctrl = devm_pinctrl_get_select(dev, "ese_suspend");
+		pinctrl = devm_pinctrl_get_select(spi_dev, "ese_suspend");
 		if (IS_ERR_OR_NULL(pinctrl))
 			P3_ERR_MSG("%s: Failed to configure ese pin\n", __func__);
 		else
@@ -213,14 +216,40 @@ err_pclk_get:
 }
 #endif
 
+static int p3_ldo_onoff(struct p3_data *data, int onoff)
+{
+	int ret = 0;
+
+	ret = gpio_request(data->vdd_1p8_gpio, "ese_vdd_1p8_gpio");
+	if (ret) {
+		P3_ERR_MSG("%s - failed to request ese_vdd_1p8_gpio\n", __func__);
+		return -EINVAL;
+	}
+	ret = gpio_direction_output(data->vdd_1p8_gpio, onoff);
+	if (ret) {
+		P3_ERR_MSG("%s - failed to direction_output ese_vdd_1p8_gpio\n", __func__);
+	} else {
+		P3_INFO_MSG("%s: use external LDO %d\n", __func__, onoff);
+	}
+	gpio_free(data->vdd_1p8_gpio);
+
+	return ret;
+}
+
 static int p3_regulator_onoff(struct p3_data *data, int onoff)
 {
 	int rc = 0;
 	struct regulator *regulator_vdd_1p8;
 
 	if (!data->vdd_1p8) {
-		pr_err("%s No vdd LDO name!\n", __func__);
-		return -ENODEV;
+		if (data->vdd_1p8_gpio) {
+			rc = p3_ldo_onoff(data, onoff);
+			msleep(10);
+			return rc;
+		} else {
+			P3_ERR_MSG("%s No vdd LDO name!\n", __func__);
+			return -ENODEV;
+		}
 	}
 
 	regulator_vdd_1p8 = regulator_get(NULL, data->vdd_1p8);
@@ -271,8 +300,10 @@ static int p3_xfer(struct p3_data *p3_device, struct p3_ioctl_transfer *tr)
 	if (p3_device == NULL || tr == NULL)
 		return -EFAULT;
 
-	if (tr->len > DEFAULT_BUFFER_SIZE || !tr->len)
+	if (tr->len > MAX_BUFFER_SIZE || !tr->len) {
+		P3_ERR_MSG("%s invalid size\n", __func__);
 		return -EMSGSIZE;
+	}
 
 	if (tr->tx_buffer != NULL) {
 		if (copy_from_user(tx_buffer,
@@ -390,7 +421,7 @@ static int spip3_open(struct inode *inode, struct file *filp)
 	p3_clk_control(p3_dev, true);
 	p3_resume();
 #else
-	p3_pinctrl_config(p3_dev->p3_device.parent, true);
+	p3_pinctrl_config(p3_dev, true);
 #endif
 
 #ifdef FEATURE_ESE_POWER_ON_OFF
@@ -436,7 +467,7 @@ static int spip3_release(struct inode *inode, struct file *filp)
 	p3_suspend();
 	usleep_range(1000, 1500);
 #else
-	p3_pinctrl_config(p3_dev->p3_device.parent, false);
+	p3_pinctrl_config(p3_dev, false);
 #endif
 #ifdef FEATURE_ESE_POWER_ON_OFF
 		ret = p3_regulator_onoff(p3_dev, 0);
@@ -540,9 +571,11 @@ static ssize_t spip3_write(struct file *filp, const char *buf, size_t count,
 
 	p3_dev = filp->private_data;
 
+	if (count > MAX_BUFFER_SIZE) {
+		P3_ERR_MSG("%s invalid size\n", __func__);
+		return -EMSGSIZE;
+	}
 	mutex_lock(&p3_dev->buffer_mutex);
-	if (count > MAX_BUFFER_SIZE)
-		count = MAX_BUFFER_SIZE;
 
 	if (copy_from_user(&tx_buffer[0], &buf[0], count)) {
 		P3_ERR_MSG("%s : failed to copy from user space\n", __func__);
@@ -584,6 +617,10 @@ static ssize_t spip3_read(struct file *filp, char *buf, size_t count,
 	unsigned char tx_buffer[MAX_BUFFER_SIZE] = {0x0, };
 	unsigned char rx_buffer[MAX_BUFFER_SIZE] = {0x0, };
 
+	if (count > MAX_BUFFER_SIZE) {
+		P3_ERR_MSG("%s invalid size\n", __func__);
+		return -EMSGSIZE;
+	}
 	P3_INFO_MSG("spip3_read count %zu - Enter\n", count);
 	mutex_lock(&p3_dev->buffer_mutex);
 
@@ -643,11 +680,17 @@ static int p3_parse_dt(struct device *dev, struct p3_data *data)
 
 	if (of_property_read_string(np, "p3-vdd-1p8",
 		&data->vdd_1p8) < 0) {
-		pr_err("%s - getting vdd_1p8 error\n", __func__);
+		P3_ERR_MSG("%s - getting vdd_1p8 error\n", __func__);
 		data->vdd_1p8 = NULL;
-	} else
-		pr_info("%s success vdd:%s\n", __func__, data->vdd_1p8);
-
+		data->vdd_1p8_gpio = of_get_named_gpio(np, "p3-vdd_1p8-gpio", 0);
+		if (gpio_is_valid(data->vdd_1p8_gpio)) {
+			P3_INFO_MSG("%s success vdd-gpio:%d\n", __func__, data->vdd_1p8_gpio);
+		} else {
+			data->vdd_1p8_gpio = 0;
+		}
+	} else {
+		P3_INFO_MSG("%s success vdd:%s\n", __func__, data->vdd_1p8);
+	}
 	return ret;
 }
 
@@ -740,7 +783,7 @@ static int spip3_probe(struct spi_device *spi)
 #ifdef CONFIG_ESE_SECURE
 	p3_suspend();
 #else
-	p3_pinctrl_config(&spi->dev, false);
+	p3_pinctrl_config(data, false);
 #endif
 
 	P3_INFO_MSG("%s finished...\n", __func__);
