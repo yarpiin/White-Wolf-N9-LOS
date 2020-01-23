@@ -38,10 +38,6 @@
 
 #include <linux/oom.h>
 
-#if defined(MALI_SEC_SECURE_RENDERING) && defined(CONFIG_SOC_EXYNOS9630)
-#include <linux/smc.h>
-#endif
-
 extern struct kbase_device *pkbdev;
 
 #if defined (CONFIG_EXYNOS_THERMAL) && defined(CONFIG_GPU_THERMAL)
@@ -298,11 +294,6 @@ static int pm_callback_runtime_on(struct kbase_device *kbdev)
 #endif
 	gpu_dvfs_start_env_data_gathering(kbdev);
 	platform->power_status = true;
-
-#if defined(MALI_SEC_SECURE_RENDERING) && defined(CONFIG_SOC_EXYNOS9630)
-		exynos_smc(SMC_DRM_G3D_PPCFW_RESTORE, 0, 0, 0);
-#endif
-
 #if 0
 #ifdef CONFIG_MALI_DVFS
 #ifdef CONFIG_MALI_SEC_CL_BOOST
@@ -338,10 +329,6 @@ static void pm_callback_runtime_off(struct kbase_device *kbdev)
 	if (!platform->early_clk_gating_status)
 		gpu_control_disable_clock(kbdev);
 #endif /* CONFIG_MALI_DVFS */
-
-#if defined(MALI_SEC_SECURE_RENDERING) && defined(CONFIG_SOC_EXYNOS9630)
-			exynos_smc(SMC_DRM_G3D_POWER_OFF, 0, 0, 0);
-#endif
 
 #if defined(CONFIG_SOC_EXYNOS7420) || defined(CONFIG_SOC_EXYNOS7890)
 	preload_balance_setup(kbdev);
@@ -389,8 +376,9 @@ static struct notifier_block gpu_noc_nb = {
 };
 #endif
 
-/* #if ((LINUX_VERSION_CODE > KERNEL_VERSION(4, 5, 0)) && \
-		(LINUX_VERSION_CODE < KERNEL_VERSION(4, 10, 0)))
+#if ((LINUX_VERSION_CODE > KERNEL_VERSION(4, 5, 0)) && \
+		(LINUX_VERSION_CODE < KERNEL_VERSION(4, 9, 0)))
+		//(LINUX_VERSION_CODE < KERNEL_VERSION(4, 10, 0)))
 static int gpu_oomdebug_notifier(struct notifier_block *self,
 						       unsigned long dummy, void *parm)
 {
@@ -403,17 +391,17 @@ static int gpu_oomdebug_notifier(struct notifier_block *self,
 		struct kbase_context *kctx;
 
 		kbdev = list_entry(entry, struct kbase_device, entry);
-		output the total memory usage and cap for this device
+		/* output the total memory usage and cap for this device */
 		pr_info("%-16s  %10u\n",
 				kbdev->devname,
 				atomic_read(&(kbdev->memdev.used_pages)));
 		mutex_lock(&kbdev->kctx_list_lock);
 		list_for_each_entry(kctx, &kbdev->kctx_list, kctx_list_link) {
-			 output the memory usage and cap for each kctx
-			   54             * opened on this device 
+			/* output the memory usage and cap for each kctx
+			   54             * opened on this device */
 			pr_info("  %s-0x%p %10u\n",
 					"kctx",
-					kctx,
+					element->kctx,
 					atomic_read(&(element->kctx->used_pages)));
 		}
 		mutex_unlock(&kbdev->kctx_list_lock);
@@ -425,7 +413,7 @@ static int gpu_oomdebug_notifier(struct notifier_block *self,
 static struct notifier_block gpu_oomdebug_nb = {
 	.notifier_call = gpu_oomdebug_notifier,
 };
-#endif */
+#endif
 
 int gpu_notifier_init(struct kbase_device *kbdev)
 {
@@ -449,12 +437,13 @@ int gpu_notifier_init(struct kbase_device *kbdev)
 
 	platform->power_status = true;
 
-	/* Cannot find following API in 4.14 kernel
- #if ((LINUX_VERSION_CODE > KERNEL_VERSION(4, 5, 0)) && \
- 		(LINUX_VERSION_CODE < KERNEL_VERSION(4, 10, 0)))
- 	if (register_oomdebug_notifier(&gpu_oomdebug_nb) < 0)
- 		pr_err("%s: failed to register oom debug notifier\n", __func__);
- #endif */
+	/* Cannot find following API in 4.14 kernel */
+#if ((LINUX_VERSION_CODE > KERNEL_VERSION(4, 5, 0)) && \
+		(LINUX_VERSION_CODE < KERNEL_VERSION(4, 9, 0)))
+		//(LINUX_VERSION_CODE < KERNEL_VERSION(4, 10, 0)))
+	if (register_oomdebug_notifier(&gpu_oomdebug_nb) < 0)
+		pr_err("%s: failed to register oom debug notifier\n", __func__);
+#endif
 
 	return 0;
 }

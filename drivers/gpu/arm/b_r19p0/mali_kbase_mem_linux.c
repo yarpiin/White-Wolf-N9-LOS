@@ -1354,6 +1354,7 @@ static struct kbase_va_region *kbase_mem_from_umm(struct kbase_context *kctx,
 	}
 
 	*va_pages = (PAGE_ALIGN(dma_buf->size) >> PAGE_SHIFT) + padding;
+
 	if (!*va_pages) {
 		dma_buf_detach(dma_buf, dma_attachment);
 		dma_buf_put(dma_buf);

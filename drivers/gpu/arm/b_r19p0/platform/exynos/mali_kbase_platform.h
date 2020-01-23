@@ -278,13 +278,7 @@ struct exynos_context {
 	int gpu_exception_count[GPU_EXCEPTION_LIST_END];
 	int balance_retry_count[BMAX_RETRY_CNT];
 	gpu_attribute *attrib;
-#if (defined(CONFIG_EXYNOS_BTS) && defined(CONFIG_MALI_NEW_BTS_API_SUPPORT))
 	int mo_min_clock;
-	unsigned int bts_scen_idx;
-	unsigned int is_set_bts; // Check the pair of bts scenario.
-#else
-	int mo_min_clock;
-#endif
 	int *save_cpu_max_freq;
 
 	unsigned int g3d_cmu_cal_id;

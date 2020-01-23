@@ -78,7 +78,6 @@ int gpu_job_fence_status_dump(struct sync_fence *timeout_fence)
 	struct list_head *entry;
 	const struct list_head *kbdev_list;
 	struct kbase_device *kbdev = NULL;
-	struct kbasep_kctx_list_element *element;
 	struct kbase_context *kctx;
 	struct sync_fence *fence;
 	unsigned long lflags;
@@ -105,8 +104,7 @@ int gpu_job_fence_status_dump(struct sync_fence *timeout_fence)
 		dev = kbdev->dev;
 		dev_warn(dev, "[%p] kbdev dev name : %s\n", kbdev, kbdev->devname);
 		mutex_lock(&kbdev->kctx_list_lock);
-		list_for_each_entry(element, &kbdev->kctx_list, kctx_list_link) {
-			kctx = element->kctx;
+		list_for_each_entry(kctx, &kbdev->kctx_list, kctx_list_link) {
 			mutex_lock(&kctx->jctx.lock);
 			dev_warn(dev, "\t[%p] kctx(%d_%d_%d)_jobs_nr(%d)\n", kctx, kctx->pid, kctx->tgid, kctx->id, kctx->jctx.job_nr);
 			if (kctx->jctx.job_nr > 0) {
