@@ -23,7 +23,7 @@
  *
  * <<Broadcom-WL-IPTag/Open:>>
  *
- * $Id: dhd_custom_msm.c 758779 2018-04-20 10:26:22Z $
+ * $Id: dhd_custom_msm.c 794399 2018-12-13 06:36:11Z $
  *
  */
 
@@ -41,9 +41,11 @@
 #include <linux/fs.h>
 #include <linux/of_gpio.h>
 #if defined(CONFIG_ARCH_MSM8996) || defined(CONFIG_ARCH_MSM8998) || \
-	defined(CONFIG_ARCH_SDM845)
+	defined(CONFIG_ARCH_SDM845) || defined(CONFIG_ARCH_SM8150)
 #include <linux/msm_pcie.h>
-#endif /* CONFIG_ARCH_MSM8996 || CONFIG_ARCH_MSM8998 || CONFIG_ARCH_SDM845 */
+#endif /* CONFIG_ARCH_MSM8996 || CONFIG_ARCH_MSM8998 ||
+	  CONFIG_ARCH_SDM845 || CONFIG_ARCH_SM8150
+	*/
 
 #ifdef CONFIG_BROADCOM_WIFI_RESERVED_MEM
 extern int dhd_init_wlan_mem(void);
@@ -56,11 +58,13 @@ static int wlan_reg_on = -1;
 #define WIFI_WL_REG_ON_PROPNAME		"wlan-en-gpio"
 
 #if defined(CONFIG_ARCH_MSM8996) || defined(CONFIG_ARCH_MSM8998) || \
-	defined(CONFIG_ARCH_SDM845)
+	defined(CONFIG_ARCH_SDM845) || defined(CONFIG_ARCH_SM8150)
 #define MSM_PCIE_CH_NUM			0
 #else
 #define MSM_PCIE_CH_NUM			1
-#endif /* CONFIG_ARCH_MSM8996 || CONFIG_ARCH_MSM8998 || CONFIG_ARCH_SDM845 */
+#endif /* CONFIG_ARCH_MSM8996 || CONFIG_ARCH_MSM8998
+	  || CONFIG_ARCH_SDM845 || CONFIG_ARCH_SM8150
+	*/
 
 #ifdef CONFIG_BCMDHD_OOB_HOST_WAKE
 static int wlan_host_wake_up = -1;
@@ -181,6 +185,16 @@ dhd_wlan_set_carddetect(int val)
 	return 0;
 }
 
+#if defined(CONFIG_BCMDHD_OOB_HOST_WAKE) && defined(CONFIG_BCMDHD_GET_OOB_STATE)
+int
+dhd_get_wlan_oob_gpio(void)
+{
+	return gpio_is_valid(wlan_host_wake_up) ?
+		gpio_get_value(wlan_host_wake_up) : -1;
+}
+EXPORT_SYMBOL(dhd_get_wlan_oob_gpio);
+#endif /* CONFIG_BCMDHD_OOB_HOST_WAKE && CONFIG_BCMDHD_GET_OOB_STATE */
+
 struct resource dhd_wlan_resources = {
 	.name	= "bcmdhd_wlan_irq",
 	.start	= 0, /* Dummy */
@@ -235,7 +249,7 @@ fail:
 	return ret;
 }
 #if defined(CONFIG_ARCH_MSM8996) || defined(CONFIG_ARCH_MSM8998) || \
-	defined(CONFIG_ARCH_SDM845)
+	defined(CONFIG_ARCH_SDM845) || defined(CONFIG_ARCH_SM8150)
 #if defined(CONFIG_DEFERRED_INITCALLS)
 deferred_module_init(dhd_wlan_init);
 #else
@@ -243,4 +257,6 @@ late_initcall(dhd_wlan_init);
 #endif /* CONFIG_DEFERRED_INITCALLS */
 #else
 device_initcall(dhd_wlan_init);
-#endif /* CONFIG_ARCH_MSM8996 || CONFIG_ARCH_MSM8998 || CONFIG_ARCH_SDM845 */
+#endif /* CONFIG_ARCH_MSM8996 || CONFIG_ARCH_MSM8998
+	* CONFIG_ARCH_SDM845 || CONFIG_ARCH_SM8150
+	*/

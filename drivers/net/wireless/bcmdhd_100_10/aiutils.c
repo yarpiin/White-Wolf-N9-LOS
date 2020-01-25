@@ -25,7 +25,7 @@
  *
  * <<Broadcom-WL-IPTag/Open:>>
  *
- * $Id: aiutils.c 726313 2017-10-12 06:07:22Z $
+ * $Id: aiutils.c 795769 2018-12-20 03:25:32Z $
  */
 #include <bcm_cfg.h>
 #include <typedefs.h>
@@ -246,11 +246,15 @@ ai_scan(si_t *sih, void *regs, uint devid)
 
 		if ((nmw + nsw == 0)) {
 			/* A component which is not a core */
-			if (cid == OOB_ROUTER_CORE_ID) {
+			if ((cid == OOB_ROUTER_CORE_ID) || (cid == HND_OOBR_CORE_ID)) {
 				asd = get_asd(sih, &eromptr, 0, 0, AD_ST_SLAVE,
 					&addrl, &addrh, &sizel, &sizeh);
 				if (asd != 0) {
-					sii->oob_router = addrl;
+					if ((sii->oob_router != 0) && (sii->oob_router != addrl)) {
+						sii->oob_router1 = addrl;
+					} else {
+						sii->oob_router = addrl;
+					}
 				}
 			}
 			if (cid != NS_CCB_CORE_ID &&
@@ -936,6 +940,97 @@ ai_corereg(si_t *sih, uint coreidx, uint regoff, uint mask, uint val)
 
 	/* readback */
 	w = R_REG(sii->osh, r);
+
+	if (!fast) {
+		/* restore core index */
+		if (origidx != coreidx)
+			ai_setcoreidx(&sii->pub, origidx);
+
+		INTR_RESTORE(sii, intr_val);
+	}
+
+	return (w);
+}
+
+/*
+ * Switch to 'coreidx', issue a single arbitrary 32bit register mask&set operation,
+ * switch back to the original core, and return the new value.
+ *
+ * When using the silicon backplane, no fiddling with interrupts or core switches is needed.
+ *
+ * Also, when using pci/pcie, we can optimize away the core switching for pci registers
+ * and (on newer pci cores) chipcommon registers.
+ */
+uint
+ai_corereg_writeonly(si_t *sih, uint coreidx, uint regoff, uint mask, uint val)
+{
+	uint origidx = 0;
+	volatile uint32 *r = NULL;
+	uint w = 0;
+	uint intr_val = 0;
+	bool fast = FALSE;
+	si_info_t *sii = SI_INFO(sih);
+	si_cores_info_t *cores_info = (si_cores_info_t *)sii->cores_info;
+
+	ASSERT(GOODIDX(coreidx));
+	ASSERT(regoff < SI_CORE_SIZE);
+	ASSERT((val & ~mask) == 0);
+
+	if (coreidx >= SI_MAXCORES)
+		return 0;
+
+	if (BUSTYPE(sih->bustype) == SI_BUS) {
+		/* If internal bus, we can always get at everything */
+		fast = TRUE;
+		/* map if does not exist */
+		if (!cores_info->regs[coreidx]) {
+			cores_info->regs[coreidx] = REG_MAP(cores_info->coresba[coreidx],
+			                            SI_CORE_SIZE);
+			ASSERT(GOODREGS(cores_info->regs[coreidx]));
+		}
+		r = (volatile uint32 *)((volatile uchar *)cores_info->regs[coreidx] + regoff);
+	} else if (BUSTYPE(sih->bustype) == PCI_BUS) {
+		/* If pci/pcie, we can get at pci/pcie regs and on newer cores to chipc */
+
+		if ((cores_info->coreid[coreidx] == CC_CORE_ID) && SI_FAST(sii)) {
+			/* Chipc registers are mapped at 12KB */
+
+			fast = TRUE;
+			r = (volatile uint32 *)((volatile char *)sii->curmap +
+			               PCI_16KB0_CCREGS_OFFSET + regoff);
+		} else if (sii->pub.buscoreidx == coreidx) {
+			/* pci registers are at either in the last 2KB of an 8KB window
+			 * or, in pcie and pci rev 13 at 8KB
+			 */
+			fast = TRUE;
+			if (SI_FAST(sii))
+				r = (volatile uint32 *)((volatile char *)sii->curmap +
+				               PCI_16KB0_PCIREGS_OFFSET + regoff);
+			else
+				r = (volatile uint32 *)((volatile char *)sii->curmap +
+				               ((regoff >= SBCONFIGOFF) ?
+				                PCI_BAR0_PCISBR_OFFSET : PCI_BAR0_PCIREGS_OFFSET) +
+				               regoff);
+		}
+	}
+
+	if (!fast) {
+		INTR_OFF(sii, intr_val);
+
+		/* save current core index */
+		origidx = si_coreidx(&sii->pub);
+
+		/* switch core */
+		r = (volatile uint32*) ((volatile uchar*) ai_setcoreidx(&sii->pub, coreidx) +
+		               regoff);
+	}
+	ASSERT(r != NULL);
+
+	/* mask and set */
+	if (mask || val) {
+		w = (R_REG(sii->osh, r) & ~mask) | val;
+		W_REG(sii->osh, r, w);
+	}
 
 	if (!fast) {
 		/* restore core index */

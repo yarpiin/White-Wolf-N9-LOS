@@ -27,7 +27,7 @@
  *
  * <<Broadcom-WL-IPTag/Open:>>
  *
- * $Id: dhd_proto.h 724495 2017-10-02 20:36:38Z $
+ * $Id: dhd_proto.h 799965 2019-01-18 06:55:56Z $
  */
 
 #ifndef _dhd_proto_h_
@@ -125,8 +125,8 @@ extern int dhd_process_pkt_reorder_info(dhd_pub_t *dhd, uchar *reorder_info_buf,
 	uint reorder_info_len, void **pkt, uint32 *free_buf_count);
 
 #ifdef BCMPCIE
-extern bool dhd_prot_process_msgbuf_txcpl(dhd_pub_t *dhd, uint bound);
-extern bool dhd_prot_process_msgbuf_rxcpl(dhd_pub_t *dhd, uint bound);
+extern bool dhd_prot_process_msgbuf_txcpl(dhd_pub_t *dhd, uint bound, int ringtype);
+extern bool dhd_prot_process_msgbuf_rxcpl(dhd_pub_t *dhd, uint bound, int ringtype);
 extern bool dhd_prot_process_msgbuf_infocpl(dhd_pub_t *dhd, uint bound);
 extern int dhd_prot_process_ctrlbuf(dhd_pub_t * dhd);
 extern int dhd_prot_process_trapbuf(dhd_pub_t * dhd);
@@ -137,7 +137,7 @@ extern void dhd_prot_rx_dataoffset(dhd_pub_t *dhd, uint32 offset);
 extern int dhd_prot_txdata(dhd_pub_t *dhd, void *p, uint8 ifidx);
 extern int dhdmsgbuf_dmaxfer_req(dhd_pub_t *dhd,
 	uint len, uint srcdelay, uint destdelay, uint d11_lpbk, uint core_num);
-extern dma_xfer_status_t dhdmsgbuf_dmaxfer_status(dhd_pub_t *dhd);
+extern int dhdmsgbuf_dmaxfer_status(dhd_pub_t *dhd, dma_xfer_info_t *result);
 
 extern void dhd_dma_buf_init(dhd_pub_t *dhd, void *dma_buf,
 	void *va, uint32 len, dmaaddr_t pa, void *dmah, void *secdma);
@@ -159,12 +159,16 @@ extern void dhd_prot_update_txflowring(dhd_pub_t *dhdp, uint16 flow_id, void *ms
 extern void dhd_prot_txdata_write_flush(dhd_pub_t *dhd, uint16 flow_id);
 extern uint32 dhd_prot_txp_threshold(dhd_pub_t *dhd, bool set, uint32 val);
 extern void dhd_prot_reset(dhd_pub_t *dhd);
+extern uint16 dhd_get_max_flow_rings(dhd_pub_t *dhd);
 
 #ifdef IDLE_TX_FLOW_MGMT
 extern int dhd_prot_flow_ring_batch_suspend_request(dhd_pub_t *dhd, uint16 *ringid, uint16 count);
 extern int dhd_prot_flow_ring_resume(dhd_pub_t *dhd, flow_ring_node_t *flow_ring_node);
 #endif /* IDLE_TX_FLOW_MGMT */
 extern int dhd_prot_init_info_rings(dhd_pub_t *dhd);
+#ifdef DHD_HP2P
+extern int dhd_prot_init_hp2p_rings(dhd_pub_t *dhd);
+#endif /* DHD_HP2P */
 
 #endif /* BCMPCIE */
 
@@ -191,6 +195,16 @@ extern bool dhd_prot_pkt_fixed_rate(dhd_pub_t *dhd, bool enable, bool set);
 
 extern void dhd_prot_dma_indx_free(dhd_pub_t *dhd);
 
+#ifdef EWP_EDL
+int dhd_prot_init_edl_rings(dhd_pub_t *dhd);
+bool dhd_prot_process_msgbuf_edl(dhd_pub_t *dhd);
+int dhd_prot_process_edl_complete(dhd_pub_t *dhd, void *evt_decode_data);
+#endif /* EWP_EDL  */
+
+/* APIs for managing a DMA-able buffer */
+int  dhd_dma_buf_alloc(dhd_pub_t *dhd, dhd_dma_buf_t *dma_buf, uint32 buf_len);
+void dhd_dma_buf_free(dhd_pub_t *dhd, dhd_dma_buf_t *dma_buf);
+
 /********************************
  * For version-string expansion *
  */
@@ -202,4 +216,17 @@ extern void dhd_prot_dma_indx_free(dhd_pub_t *dhd);
 #define DHD_PROTOCOL "unknown"
 #endif /* proto */
 
+void dhd_get_hscb_info(struct dhd_prot *prot, void ** va, uint32 *len);
+int dhd_get_hscb_buff(struct dhd_prot *prot, uint32 offset, uint32 length, void * buff);
+
+#ifdef DHD_HP2P
+extern uint8 dhd_prot_hp2p_enable(dhd_pub_t *dhd, bool set, int enable);
+extern uint32 dhd_prot_pkt_threshold(dhd_pub_t *dhd, bool set, uint32 val);
+extern uint32 dhd_prot_time_threshold(dhd_pub_t *dhd, bool set, uint32 val);
+extern uint32 dhd_prot_pkt_expiry(dhd_pub_t *dhd, bool set, uint32 val);
+#endif // endif
+
+#ifdef DHD_MAP_LOGGING
+extern void dhd_prot_smmu_fault_dump(dhd_pub_t *dhdp);
+#endif /* DHD_MAP_LOGGING */
 #endif /* _dhd_proto_h_ */

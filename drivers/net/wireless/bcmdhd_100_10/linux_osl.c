@@ -24,7 +24,7 @@
  *
  * <<Broadcom-WL-IPTag/Open:>>
  *
- * $Id: linux_osl.c 794162 2018-12-12 08:18:57Z $
+ * $Id: linux_osl.c 813270 2019-04-04 08:03:55Z $
  */
 
 #define LINUX_PORT
@@ -1219,6 +1219,21 @@ osl_get_localtime(uint64 *sec, uint64 *usec)
 	*usec = (uint64)(rem_nsec / MSEC_PER_SEC);
 }
 
+uint64
+osl_systztime_us(void)
+{
+	struct timeval tv;
+	uint64 tzusec;
+
+	do_gettimeofday(&tv);
+	/* apply timezone */
+	tzusec = (uint64)((tv.tv_sec - (sys_tz.tz_minuteswest * 60)) *
+		USEC_PER_SEC);
+	tzusec += tv.tv_usec;
+
+	return tzusec;
+}
+
 /*
  * OSLREGOPS specifies the use of osl_XXX routines to be used for register access
  */
@@ -1265,7 +1280,12 @@ osl_os_get_image_block(char *buf, int len, void *image)
 	if (!image)
 		return 0;
 
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(4, 14, 0))
+	rdlen = kernel_read(fp, buf, len, &fp->f_pos);
+#else
 	rdlen = kernel_read(fp, fp->f_pos, buf, len);
+#endif /* (LINUX_VERSION_CODE >= KERNEL_VERSION(4, 14, 0)) */
+
 	if (rdlen > 0)
 		fp->f_pos += rdlen;
 
@@ -1889,6 +1909,15 @@ osl_sec_dma_free_consistent(osl_t *osh, void *va, uint size, dmaaddr_t pa)
 /* timer apis */
 /* Note: All timer api's are thread unsafe and should be protected with locks by caller */
 
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 15, 0)
+void
+timer_cb_compat(struct timer_list *tl)
+{
+	timer_list_compat_t *t = container_of(tl, timer_list_compat_t, timer);
+	t->callback((ulong)t->arg);
+}
+#endif /* LINUX_VERSION_CODE >= KERNEL_VERSION(4, 15, 0) */
+
 osl_timer_t *
 osl_timer_init(osl_t *osh, const char *name, void (*fn)(void *arg), void *arg)
 {
@@ -1905,11 +1934,9 @@ osl_timer_init(osl_t *osh, const char *name, void (*fn)(void *arg), void *arg)
 		MFREE(NULL, t, sizeof(osl_timer_t));
 		return (NULL);
 	}
-	t->timer->data = (ulong)arg;
-	t->timer->function = (linux_timer_fn)fn;
 	t->set = TRUE;
 
-	init_timer(t->timer);
+	init_timer_compat(t->timer, (linux_timer_fn)fn, arg);
 
 	return (t);
 }
@@ -1927,7 +1954,7 @@ osl_timer_add(osl_t *osh, osl_timer_t *t, uint32 ms, bool periodic)
 	if (periodic) {
 		printf("Periodic timers are not supported by Linux timer apis\n");
 	}
-	t->timer->expires = jiffies + ms*HZ/1000;
+	timer_expires(t->timer) = jiffies + ms*HZ/1000;
 
 	add_timer(t->timer);
 
@@ -1945,9 +1972,9 @@ osl_timer_update(osl_t *osh, osl_timer_t *t, uint32 ms, bool periodic)
 		printf("Periodic timers are not supported by Linux timer apis\n");
 	}
 	t->set = TRUE;
-	t->timer->expires = jiffies + ms*HZ/1000;
+	timer_expires(t->timer) = jiffies + ms*HZ/1000;
 
-	mod_timer(t->timer, t->timer->expires);
+	mod_timer(t->timer, timer_expires(t->timer));
 
 	return;
 }

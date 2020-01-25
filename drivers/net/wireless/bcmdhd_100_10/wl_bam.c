@@ -24,7 +24,7 @@
  *
  * <<Broadcom-WL-IPTag/Open:>>
  *
- * $Id: wl_bam.c 790523 2018-11-26 08:24:06Z $
+ * $Id: wl_bam.c 804433 2019-02-13 04:52:59Z $
  */
 #include <bcmiov.h>
 #include <linux/time.h>
@@ -81,6 +81,11 @@ wl_bad_ap_mngr_tm2ts(struct timespec *ts, const struct tm tm)
 	ts->tv_nsec = 0;
 }
 
+/* Ignore compiler warnings due to -Werror=cast-qual */
+#if defined(STRICT_GCC_WARNINGS) && defined(__GNUC__)
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wcast-qual"
+#endif // endif
 static int
 wl_bad_ap_mngr_timecmp(void *priv, struct list_head *a, struct list_head *b)
 {
@@ -121,6 +126,9 @@ wl_bad_ap_mngr_update(struct bcm_cfg80211 *cfg, wl_bad_ap_info_t *bad_ap_info)
 	}
 	spin_unlock_irqrestore(&cfg->bad_ap_mngr.lock, flags);
 }
+#if defined(STRICT_GCC_WARNINGS) && defined(__GNUC__)
+#pragma GCC diagnostic pop
+#endif // endif
 
 static inline int
 wl_bad_ap_mngr_fread_bad_ap_info(char *buf, int buf_len, wl_bad_ap_info_t *bad_ap)
@@ -496,20 +504,12 @@ wl_event_adps_bad_ap_mngr(struct bcm_cfg80211 *cfg, void *data)
 	return ret;
 }
 
-/*
- * Return value:
- *  Disabled: 0
- *  Enabled: WLC_BAND_2G, WLC_BAND_5G, WLC_BAND_ALL
- *
- */
-int
-wl_adps_enabled(struct bcm_cfg80211 *cfg, struct net_device *ndev)
+static int
+wl_adps_get_mode(struct net_device *ndev, uint8 band)
 {
 	int len;
-	int ret = 0;
+	int ret;
 
-	uint8 i;
-	uint8 band;
 	uint8 *pdata;
 	char buf[WLC_IOCTL_SMLEN];
 
@@ -523,31 +523,40 @@ wl_adps_enabled(struct bcm_cfg80211 *cfg, struct net_device *ndev)
 	iov_buf.version = WL_ADPS_IOV_VER;
 	iov_buf.len = sizeof(band);
 	iov_buf.id = WL_ADPS_IOV_MODE;
-
-	band = 0;
 	pdata = (uint8 *)iov_buf.data;
-	for (i = 1; i <= MAX_BANDS; i++) {
-		*pdata = i;
-		ret = wldev_iovar_getbuf(ndev, "adps", &iov_buf, len, buf, WLC_IOCTL_SMLEN, NULL);
-		if (ret < 0) {
-			WL_ERR(("%s - fail to get adps for band %d (%d)\n",
-				__FUNCTION__, i, ret));
-			return 0;
-		}
-		resp = (bcm_iov_buf_t *)buf;
-		data = (wl_adps_params_v1_t *)resp->data;
+	*pdata = band;
 
-		if (data->mode) {
-			if (data->band == IEEE80211_BAND_2GHZ) {
-				band += WLC_BAND_2G;
-			}
-			else if (data->band == IEEE80211_BAND_5GHZ) {
-				band += WLC_BAND_5G;
-			}
+	ret = wldev_iovar_getbuf(ndev, "adps", &iov_buf, len, buf, WLC_IOCTL_SMLEN, NULL);
+	if (ret < 0) {
+		return ret;
+	}
+	resp = (bcm_iov_buf_t *)buf;
+	data = (wl_adps_params_v1_t *)resp->data;
+
+	return data->mode;
+}
+
+/*
+ * Return value:
+ *  Disabled: 0
+ *  Enabled: bitmap of WLC_BAND_2G or WLC_BAND_5G when ADPS is enabled at each BAND
+ *
+ */
+int
+wl_adps_enabled(struct bcm_cfg80211 *cfg, struct net_device *ndev)
+{
+	uint8 i;
+	int mode;
+	int ret = 0;
+
+	for (i = 1; i <= MAX_BANDS; i++) {
+		mode = wl_adps_get_mode(ndev, i);
+		if (mode > 0) {
+			ret |= (1 << i);
 		}
 	}
 
-	return band;
+	return ret;
 }
 
 int
@@ -569,7 +578,7 @@ wl_adps_set_suspend(struct bcm_cfg80211 *cfg, struct net_device *ndev, uint8 sus
 	}
 
 	iov_buf->version = WL_ADPS_IOV_VER;
-	iov_buf->len = buf_len;
+	iov_buf->len = sizeof(*data);
 	iov_buf->id = WL_ADPS_IOV_SUSPEND;
 
 	data = (wl_adps_suspend_v1_t *)iov_buf->data;

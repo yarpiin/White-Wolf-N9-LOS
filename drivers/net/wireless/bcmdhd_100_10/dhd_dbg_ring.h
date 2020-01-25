@@ -23,7 +23,7 @@
  * software in any way with any other Broadcom software provided under a license
  * other than the GPL, without Broadcom's express prior written consent.
  *
- * $Id: dhd_dbg_ring.h 754183 2018-03-26 11:15:16Z $
+ * $Id: dhd_dbg_ring.h 787940 2018-11-07 12:58:02Z $
  */
 
 #ifndef __DHD_DBG_RING_H__
@@ -81,6 +81,7 @@ typedef struct dhd_dbg_ring {
 	uint32  ring_size;	/* numbers of item in ring */
 	uint32  wp;		/* write pointer */
 	uint32  rp;		/* read pointer */
+	uint32  rp_tmp;		/* tmp read pointer */
 	uint32  log_level;	/* log_level */
 	uint32  threshold;	/* threshold bytes */
 	void *  ring_buf;	/* pointer of actually ring buffer */
@@ -90,6 +91,7 @@ typedef struct dhd_dbg_ring {
 	bool tail_padded;	/* writer does not have enough space */
 	uint32 rem_len;		/* number of bytes from wp_pad to end */
 	bool sched_pull;	/* schedule reader immediately */
+	bool pull_inactive;	/* pull contents from ring even if it is inactive */
 } dhd_dbg_ring_t;
 
 #define DBGRING_FLUSH_THRESHOLD(ring)		(ring->ring_size / 3)
@@ -122,7 +124,7 @@ typedef struct dhd_dbg_ring {
 typedef void (*os_pullreq_t)(void *os_priv, const int ring_id);
 
 int dhd_dbg_ring_init(dhd_pub_t *dhdp, dhd_dbg_ring_t *ring, uint16 id, uint8 *name,
-		uint32 ring_sz, void *allocd_buf);
+		uint32 ring_sz, void *allocd_buf, bool pull_inactive);
 void dhd_dbg_ring_deinit(dhd_pub_t *dhdp, dhd_dbg_ring_t *ring);
 int dhd_dbg_ring_push(dhd_dbg_ring_t *ring, dhd_dbg_ring_entry_t *hdr, void *data);
 int dhd_dbg_ring_pull(dhd_dbg_ring_t *ring, void *data, uint32 buf_len,

@@ -24,7 +24,7 @@
  *
  * <<Broadcom-WL-IPTag/Open:>>
  *
- * $Id: pcicfg.h 794374 2018-12-13 05:40:58Z $
+ * $Id: pcicfg.h 792963 2018-12-06 10:18:17Z $
  */
 
 #ifndef	_h_pcicfg_
@@ -78,6 +78,7 @@
 #define PCI_CAP_MSICAP_ID		0x05
 #define PCI_CAP_VENDSPEC_ID		0x09
 #define PCI_CAP_PCIECAP_ID		0x10
+#define PCI_CAP_MSIXCAP_ID		0x11
 
 /* Data structure to define the Message Signalled Interrupt facility
  * Valid for PCI and PCIE configurations
@@ -137,7 +138,7 @@ typedef struct _pciconfig_cap_pcie {
 #define PCIE_ADV_CORR_ERR_MASK	0x114
 #define PCIE_ADV_CORR_ERR_MASK_OFFSET	0x14
 #define CORR_ERR_RE	(1 << 0) /* Receiver  */
-#define CORR_ERR_BT 	(1 << 6) /* Bad TLP  */
+#define CORR_ERR_BT	(1 << 6) /* Bad TLP  */
 #define CORR_ERR_BD	(1 << 7) /* Bad DLLP */
 #define CORR_ERR_RR	(1 << 8) /* REPLAY_NUM rollover */
 #define CORR_ERR_RT	(1 << 12) /* Reply timer timeout */

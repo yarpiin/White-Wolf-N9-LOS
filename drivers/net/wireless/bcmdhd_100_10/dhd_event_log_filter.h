@@ -23,19 +23,33 @@
  *
  * <<Broadcom-WL-IPTag/Open:>>
  *
- * $Id: dhd_event_log_filter.h 726962 2017-10-17 10:14:12Z $
+ * $Id: dhd_event_log_filter.h 789224 2018-11-15 13:43:23Z $
  */
 
 #ifndef dhd_event_log_filter_h
 #define dhd_event_log_filter_h
 #include <dhd.h>
 #include <event_log_tag.h>
+
+typedef struct {
+	uint16	version;
+	uint8	htr_type;	/* from wl_slice_hist_XX_stats_xtlv_id */
+	uint8	htr_num;	/* number of elements in htr_running or htr_rc */
+	uint32	htr_rn_last;	/* last reasons along with seq, etc */
+	uint32	htr_rn_ts_last;	/* last time stamps corr to htr_rn_last */
+	uint32	htr_rn_prev;	/* last reasons along with seq, etc */
+	uint32	htr_rn_ts_prev;	/* last time stamps corr to htr_rn_prev */
+	uint32	htr_rc_max;	/* largest toss reasons and counts */
+	uint32	htr_rc_ts_max;	/* latest time stamp corr to htr_rc_max */
+	uint32	htr_rc_secnd;	/* second largest toss reasons and counts */
+	uint32	htr_rc_ts_secnd;	/* latest time stamps corr to htr_rc_second */
+} evt_hist_compact_toss_stats_v1_t;
+
 int dhd_event_log_filter_init(dhd_pub_t *dhdp, uint8 *buf, uint32 buf_size);
 void dhd_event_log_filter_deinit(dhd_pub_t *dhdp);
 void dhd_event_log_filter_event_handler(
-	dhd_pub_t *dhdp, event_log_hdr_t *log_hdr, uint32 *data);
+	dhd_pub_t *dhdp, prcd_event_log_hdr_t *plog_hdr, uint32 *data);
 
 void dhd_event_log_filter_notify_connect_request(dhd_pub_t *dhdp, uint8 *bssid, int channel);
 void dhd_event_log_filter_notify_connect_done(dhd_pub_t *dhdp, uint8 *bssid, int roam);
-
 #endif /* dhd_event_log_filter_h */

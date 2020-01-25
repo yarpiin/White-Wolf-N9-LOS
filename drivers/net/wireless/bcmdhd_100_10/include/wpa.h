@@ -24,7 +24,7 @@
  *
  * <<Broadcom-WL-IPTag/Open:>>
  *
- * $Id: wpa.h 758863 2018-04-21 00:29:12Z $
+ * $Id: wpa.h 785355 2018-10-18 05:32:56Z $
  */
 
 #ifndef _proto_wpa_h_
@@ -180,15 +180,27 @@ typedef BWL_PRE_PACKED_STRUCT struct
 			(akm) == RSN_AKM_SHA256_PSK || \
 			(akm) == RSN_AKM_TPK || \
 			(akm) == RSN_AKM_SAE_PSK || \
-			(akm) == RSN_AKM_SAE_PSK || \
+			(akm) == RSN_AKM_SAE_FBT || \
 			(akm) == RSN_AKM_FILS_SHA256 || \
 			(akm) == RSN_AKM_FILS_SHA384 || \
-			(akm) == RSN_AKM_OWE)
+			(akm) == RSN_AKM_OWE || \
+			(akm) == RSN_AKM_SUITEB_SHA256_1X || \
+			(akm) == RSN_AKM_SUITEB_SHA384_1X)
 
 #define IS_VALID_BIP_CIPHER(cipher) ((cipher) == WPA_CIPHER_BIP || \
 					(cipher) == WPA_CIPHER_BIP_GMAC_128 || \
 					(cipher) == WPA_CIPHER_BIP_GMAC_256 || \
 					(cipher) == WPA_CIPHER_BIP_CMAC_256)
+
+#define WPA_IS_FT_AKM(akm)	((akm) == RSN_AKM_FBT_SHA256 || \
+			(akm) == RSN_AKM_FBT_SHA384)
+
+#define WPA_IS_FILS_AKM(akm)	((akm) == RSN_AKM_FILS_SHA256 || \
+			(akm) == RSN_AKM_FILS_SHA384)
+
+#define WPA_IS_FILS_FT_AKM(akm)	((akm) == RSN_AKM_FBT_SHA256_FILS || \
+			(akm) == RSN_AKM_FBT_SHA384_FILS)
+
 /* WPA TKIP countermeasures parameters */
 #define WPA_TKIP_CM_DETECT	60	/* multiple MIC failure window (seconds) */
 #define WPA_TKIP_CM_BLOCK	60	/* countermeasures active window (seconds) */
@@ -266,6 +278,8 @@ typedef struct rsn_ie_info {
 	uint8 kek_len;				/* EAPOL KEK */
 	uint8 tk_len;				/* EAPOL TK */
 	uint8 ptk_len;				/* EAPOL PTK */
+	uint8 kck2_len;				/* EAPOL KCK2 */
+	uint8 kek2_len;				/* EAPOL KEK2 */
 } rsn_ie_info_t;
 
 #ifdef BCMWAPI_WAI

@@ -25,7 +25,7 @@
  *
  * <<Broadcom-WL-IPTag/Open:>>
  *
- * $Id: siutils.c 791448 2018-11-29 12:07:50Z $
+ * $Id: siutils.c 795769 2018-12-20 03:25:32Z $
  */
 
 #include <bcm_cfg.h>
@@ -1039,6 +1039,23 @@ si_setint(si_t *sih, int siflag)
 		ASSERT(0);
 }
 
+uint32
+si_oobr_baseaddr(si_t *sih, bool second)
+{
+	si_info_t *sii = SI_INFO(sih);
+
+	if (CHIPTYPE(sih->socitype) == SOCI_SB)
+		return 0;
+	else if ((CHIPTYPE(sih->socitype) == SOCI_AI) ||
+		(CHIPTYPE(sih->socitype) == SOCI_DVTBUS) ||
+		(CHIPTYPE(sih->socitype) == SOCI_NAI))
+		return (second ? sii->oob_router1 : sii->oob_router);
+	else {
+		ASSERT(0);
+		return 0;
+	}
+}
+
 uint
 si_coreid(si_t *sih)
 {
@@ -1604,6 +1621,12 @@ si_corereg(si_t *sih, uint coreidx, uint regoff, uint mask, uint val)
 	}
 }
 
+uint
+si_corereg_writeonly(si_t *sih, uint coreidx, uint regoff, uint mask, uint val)
+{
+	return ai_corereg_writeonly(sih, coreidx, regoff, mask, val);
+}
+
 /** ILP sensitive register access needs special treatment to avoid backplane stalls */
 bool si_pmu_is_ilp_sensitive(uint32 idx, uint regoff)
 {
@@ -1717,9 +1740,9 @@ si_num_slaveports(si_t *sih, uint coreid)
 	uint num = 0;
 
 	if (idx != BADIDX) {
-	if (CHIPTYPE(sih->socitype) == SOCI_AI) {
-		num = ai_num_slaveports(sih, idx);
-	}
+		if (CHIPTYPE(sih->socitype) == SOCI_AI) {
+			num = ai_num_slaveports(sih, idx);
+		}
 	}
 	return num;
 }
@@ -1961,6 +1984,7 @@ si_chip_hostif(si_t *sih)
 		 else if (CST4369_CHIPMODE_PCIE(sih->chipst))
 			 hosti = CHIP_HOSTIF_PCIEMODE;
 		 break;
+
 	case BCM4350_CHIP_ID:
 	case BCM4354_CHIP_ID:
 	case BCM43556_CHIP_ID:
@@ -2855,6 +2879,7 @@ si_tcm_size(si_t *sih)
 	bool wasup;
 	uint32 corecap;
 	uint memsize = 0;
+	uint banku_size = 0;
 	uint32 nab = 0;
 	uint32 nbb = 0;
 	uint32 totb = 0;
@@ -2891,7 +2916,12 @@ si_tcm_size(si_t *sih)
 		W_REG(sii->osh, arm_bidx, idx);
 
 		bxinfo = R_REG(sii->osh, arm_binfo);
-		memsize += ((bxinfo & ARMCR4_BSZ_MASK) + 1) * ARMCR4_BSZ_MULT;
+		if (bxinfo & ARMCR4_BUNITSZ_MASK) {
+			banku_size = ARMCR4_BSZ_1K;
+		} else {
+			banku_size = ARMCR4_BSZ_8K;
+		}
+		memsize += ((bxinfo & ARMCR4_BSZ_MASK) + 1) * banku_size;
 	}
 
 	/* Return to previous state and core */
@@ -3516,11 +3546,7 @@ bool _bcmsrpwr = TRUE;
 bool _bcmsrpwr = FALSE;
 #endif // endif
 
-#ifndef BCMSDIO
-#define PWRREQ_OFFSET(sih)	DAR_PCIE_PWR_CTRL((sih)->buscorerev)
-#else
 #define PWRREQ_OFFSET(sih)	OFFSETOF(chipcregs_t, powerctl)
-#endif // endif
 
 static void
 si_corereg_pciefast_write(si_t *sih, uint regoff, uint val)
@@ -3544,12 +3570,6 @@ si_corereg_pciefast_read(si_t *sih, uint regoff)
 
 	ASSERT((BUSTYPE(sih->bustype) == PCI_BUS));
 
-#ifndef BCMSDIO
-	if (PCIECOREREV(sih->buscorerev) == 66) {
-		si_corereg_pciefast_write(sih, OFFSETOF(sbpcieregs_t, u1.dar_64.dar_ctrl), 0);
-	}
-#endif // endif
-
 	r = (volatile uint32 *)((volatile char *)sii->curmap +
 		PCI_16KB0_PCIREGS_OFFSET + regoff);
 
@@ -3559,8 +3579,8 @@ si_corereg_pciefast_read(si_t *sih, uint regoff)
 uint32
 si_srpwr_request(si_t *sih, uint32 mask, uint32 val)
 {
-	uint32 r, offset = (uint32)((BUSTYPE(sih->bustype) == SI_BUS) ?
-		OFFSETOF(chipcregs_t, powerctl) : PWRREQ_OFFSET(sih));
+	uint32 r, offset = (BUSTYPE(sih->bustype) == SI_BUS) ?
+		OFFSETOF(chipcregs_t, powerctl) : PWRREQ_OFFSET(sih);
 	uint32 mask2 = mask;
 	uint32 val2 = val;
 	volatile uint32 *fast_srpwr_addr = (volatile uint32 *)((uintptr)SI_ENUM_BASE(sih)
@@ -3612,8 +3632,8 @@ si_srpwr_request(si_t *sih, uint32 mask, uint32 val)
 uint32
 si_srpwr_stat_spinwait(si_t *sih, uint32 mask, uint32 val)
 {
-	uint32 r, offset = (uint32)((BUSTYPE(sih->bustype) == SI_BUS) ?
-		OFFSETOF(chipcregs_t, powerctl) : PWRREQ_OFFSET(sih));
+	uint32 r, offset = (BUSTYPE(sih->bustype) == SI_BUS) ?
+		OFFSETOF(chipcregs_t, powerctl) : PWRREQ_OFFSET(sih);
 	volatile uint32 *fast_srpwr_addr = (volatile uint32 *)((uintptr)SI_ENUM_BASE(sih)
 					 + (uintptr)offset);
 
@@ -3644,9 +3664,9 @@ si_srpwr_stat_spinwait(si_t *sih, uint32 mask, uint32 val)
 uint32
 si_srpwr_stat(si_t *sih)
 {
-	uint32 r, offset = (uint32)((BUSTYPE(sih->bustype) == SI_BUS) ?
-		OFFSETOF(chipcregs_t, powerctl) : PWRREQ_OFFSET(sih));
-	uint cidx = (uint)((BUSTYPE(sih->bustype) == SI_BUS) ? SI_CC_IDX : sih->buscoreidx);
+	uint32 r, offset = (BUSTYPE(sih->bustype) == SI_BUS) ?
+		OFFSETOF(chipcregs_t, powerctl) : PWRREQ_OFFSET(sih);
+	uint cidx = (BUSTYPE(sih->bustype) == SI_BUS) ? SI_CC_IDX : sih->buscoreidx;
 
 	if (BUSTYPE(sih->bustype) == SI_BUS) {
 		r = si_corereg(sih, cidx, offset, 0, 0);
@@ -3662,9 +3682,9 @@ si_srpwr_stat(si_t *sih)
 uint32
 si_srpwr_domain(si_t *sih)
 {
-	uint32 r, offset = (uint32)((BUSTYPE(sih->bustype) == SI_BUS) ?
-		OFFSETOF(chipcregs_t, powerctl) : PWRREQ_OFFSET(sih));
-	uint cidx = (uint)((BUSTYPE(sih->bustype) == SI_BUS) ? SI_CC_IDX : sih->buscoreidx);
+	uint32 r, offset = (BUSTYPE(sih->bustype) == SI_BUS) ?
+		OFFSETOF(chipcregs_t, powerctl) : PWRREQ_OFFSET(sih);
+	uint cidx = (BUSTYPE(sih->bustype) == SI_BUS) ? SI_CC_IDX : sih->buscoreidx;
 
 	if (BUSTYPE(sih->bustype) == SI_BUS) {
 		r = si_corereg(sih, cidx, offset, 0, 0);

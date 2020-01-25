@@ -38,7 +38,7 @@
  *
  * <<Broadcom-WL-IPTag/Open:>>
  *
- * $Id: packed_section_end.h 666738 2016-10-24 12:16:37Z $
+ * $Id: packed_section_end.h 776894 2018-08-16 05:50:57Z $
  */
 
 /* Error check - BWL_PACKED_SECTION is defined in packed_section_start.h

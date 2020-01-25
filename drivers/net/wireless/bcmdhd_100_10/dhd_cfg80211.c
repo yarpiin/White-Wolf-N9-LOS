@@ -24,7 +24,7 @@
  *
  * <<Broadcom-WL-IPTag/Open:>>
  *
- * $Id: dhd_cfg80211.c 784256 2018-10-11 10:30:36Z $
+ * $Id: dhd_cfg80211.c 771186 2018-07-09 09:14:04Z $
  */
 
 #include <linux/vmalloc.h>
@@ -207,6 +207,29 @@ wl_dongle_down(struct net_device *ndev)
 	if (unlikely(err)) {
 		WL_ERR(("WLC_DOWN error (%d)\n", err));
 	}
+	return err;
+}
+
+s32
+wl_dongle_roam(struct net_device *ndev, u32 roamvar, u32 bcn_timeout)
+{
+	s32 err = 0;
+
+	/* Setup timeout if Beacons are lost and roam is off to report link down */
+	if (roamvar) {
+		err = wldev_iovar_setint(ndev, "bcn_timeout", bcn_timeout);
+		if (unlikely(err)) {
+			WL_ERR(("bcn_timeout error (%d)\n", err));
+			goto dongle_rom_out;
+		}
+	}
+	/* Enable/Disable built-in roaming to allow supplicant to take care of roaming */
+	err = wldev_iovar_setint(ndev, "roam_off", roamvar);
+	if (unlikely(err)) {
+		WL_ERR(("roam_off error (%d)\n", err));
+		goto dongle_rom_out;
+	}
+dongle_rom_out:
 	return err;
 }
 

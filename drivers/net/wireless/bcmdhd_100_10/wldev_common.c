@@ -24,7 +24,7 @@
  *
  * <<Broadcom-WL-IPTag/Open:>>
  *
- * $Id: wldev_common.c 796833 2018-12-27 05:52:37Z $
+ * $Id: wldev_common.c 786015 2018-10-24 08:21:53Z $
  */
 
 #include <osl.h>
@@ -36,6 +36,7 @@
 #include <bcmutils.h>
 #ifdef WL_CFG80211
 #include <wl_cfg80211.h>
+#include <wl_cfgscan.h>
 #endif /* WL_CFG80211 */
 
 #define htod32(i) (i)
@@ -380,12 +381,6 @@ int wldev_set_band(
 {
 	int error = -1;
 
-#ifdef DHD_2G_ONLY_SUPPORT
-	if (band != WLC_BAND_2G) {
-		WLDEV_ERROR(("Enabled DHD only Band B support!! Blocked Band A!!\n"));
-		band = WLC_BAND_2G;
-	}
-#endif /* DHD_2G_ONLY_SUPPORT */
 	if ((band == WLC_BAND_AUTO) || (band == WLC_BAND_5G) || (band == WLC_BAND_2G)) {
 		error = wldev_ioctl_set(dev, WLC_SET_BAND, &band, sizeof(band));
 		if (!error)

@@ -24,7 +24,7 @@
  *
  * <<Broadcom-WL-IPTag/Open:>>
  *
- * $Id: wl_cfgp2p.c 783638 2018-10-08 02:24:49Z $
+ * $Id: wl_cfgp2p.c 819436 2019-05-13 12:28:10Z $
  *
  */
 #include <typedefs.h>
@@ -41,6 +41,7 @@
 #include <asm/uaccess.h>
 
 #include <bcmutils.h>
+#include <bcmstdlib_s.h>
 #include <bcmendian.h>
 #include <ethernet.h>
 #include <802.11.h>
@@ -48,6 +49,7 @@
 
 #include <wl_cfg80211.h>
 #include <wl_cfgp2p.h>
+#include <wl_cfgscan.h>
 #include <wldev_common.h>
 #include <wl_android.h>
 #include <dngl_stats.h>
@@ -729,7 +731,7 @@ wl_cfgp2p_init_discovery(struct bcm_cfg80211 *cfg)
 	 * so that time, the ifidx returned in WLC_E_IF should be used for populating
 	 * the netinfo
 	 */
-	ret = wl_alloc_netinfo(cfg, NULL, cfg->p2p_wdev, WL_MODE_BSS, 0, bssidx, 0);
+	ret = wl_alloc_netinfo(cfg, NULL, cfg->p2p_wdev, WL_IF_TYPE_STA, 0, bssidx, 0);
 	if (unlikely(ret)) {
 		goto exit;
 	}
@@ -1208,7 +1210,8 @@ wl_cfgp2p_vndr_ie(struct bcm_cfg80211 *cfg, u8 *iebuf, s32 pktflag,
 	/* Validate the pktflag parameter */
 	if ((pktflag & ~(VNDR_IE_BEACON_FLAG | VNDR_IE_PRBRSP_FLAG |
 	            VNDR_IE_ASSOCRSP_FLAG | VNDR_IE_AUTHRSP_FLAG |
-	            VNDR_IE_PRBREQ_FLAG | VNDR_IE_ASSOCREQ_FLAG))) {
+	            VNDR_IE_PRBREQ_FLAG | VNDR_IE_ASSOCREQ_FLAG |
+	            VNDR_IE_DISASSOC_FLAG))) {
 		CFGP2P_ERR(("p2pwl_vndr_ie: Invalid packet flag 0x%x\n", pktflag));
 		return -1;
 	}
@@ -1220,6 +1223,11 @@ wl_cfgp2p_vndr_ie(struct bcm_cfg80211 *cfg, u8 *iebuf, s32 pktflag,
 	/* Set the IE count - the buffer contains only 1 IE */
 	iecount = htod32(1);
 	memcpy((void *)&hdr.vndr_ie_buffer.iecount, &iecount, sizeof(s32));
+
+	/* For vendor ID DOT11_MNG_ID_EXT_ID, need to set pkt flag to VNDR_IE_CUSTOM_FLAG */
+	if (ie_id == DOT11_MNG_ID_EXT_ID) {
+		pktflag = pktflag | VNDR_IE_CUSTOM_FLAG;
+	}
 
 	/* Copy packet flags that indicate which packets will contain this IE */
 	pktflag = htod32(pktflag);
@@ -1493,7 +1501,7 @@ wl_cfgp2p_discover_listen(struct bcm_cfg80211 *cfg, s32 channel, u32 duration_ms
 {
 #define EXTRA_DELAY_TIME	100
 	s32 ret = BCME_OK;
-	struct timer_list *_timer;
+	timer_list_compat_t *_timer;
 	s32 extra_delay;
 	struct net_device *netdev = bcmcfg_to_prmry_ndev(cfg);
 
@@ -1594,7 +1602,7 @@ wl_cfgp2p_action_tx_complete(struct bcm_cfg80211 *cfg, bcm_struct_cfgdev *cfgdev
 			CFGP2P_DBG((" WLC_E_ACTION_FRAME_COMPLETE is received : %d\n", status));
 			if (status == WLC_E_STATUS_SUCCESS) {
 				wl_set_p2p_status(cfg, ACTION_TX_COMPLETED);
-				CFGP2P_DBG(("WLC_E_ACTION_FRAME_COMPLETE : ACK\n"));
+				CFGP2P_ACTION(("TX actfrm : ACK\n"));
 				if (!cfg->need_wait_afrx && cfg->af_sent_channel) {
 					CFGP2P_DBG(("no need to wait next AF.\n"));
 					wl_stop_wait_next_action_frame(cfg, ndev, bsscfgidx);
@@ -1602,7 +1610,11 @@ wl_cfgp2p_action_tx_complete(struct bcm_cfg80211 *cfg, bcm_struct_cfgdev *cfgdev
 			}
 			else if (!wl_get_p2p_status(cfg, ACTION_TX_COMPLETED)) {
 				wl_set_p2p_status(cfg, ACTION_TX_NOACK);
-				CFGP2P_DBG(("WLC_E_ACTION_FRAME_COMPLETE : NO ACK\n"));
+				if (status == WLC_E_STATUS_SUPPRESS) {
+					CFGP2P_ACTION(("TX actfrm : SUPPRES\n"));
+				} else {
+					CFGP2P_ACTION(("TX actfrm : NO ACK\n"));
+				}
 				wl_stop_wait_next_action_frame(cfg, ndev, bsscfgidx);
 			}
 		} else {
@@ -1629,7 +1641,7 @@ wl_cfgp2p_tx_action_frame(struct bcm_cfg80211 *cfg, struct net_device *dev,
 {
 	s32 ret = BCME_OK;
 	s32 evt_ret = BCME_OK;
-	long timeout = 0;
+	s32 timeout = 0;
 	wl_eventmsg_buf_t buf;
 
 	CFGP2P_DBG(("\n"));
@@ -1654,7 +1666,7 @@ wl_cfgp2p_tx_action_frame(struct bcm_cfg80211 *cfg, struct net_device *dev,
 		cfg->ioctl_buf, WLC_IOCTL_MAXLEN, bssidx, &cfg->ioctl_buf_sync);
 
 	if (ret < 0) {
-		CFGP2P_ERR((" sending action frame is failed\n"));
+		CFGP2P_ACTION(("TX actfrm : ERROR\n"));
 		goto exit;
 	}
 
@@ -2039,6 +2051,7 @@ wl_cfgp2p_set_p2p_ecsa(struct bcm_cfg80211 *cfg, struct net_device *ndev, char* 
 			return BCME_ERROR;
 		}
 
+		memset_s(&csa_arg, sizeof(csa_arg), 0, sizeof(csa_arg));
 		csa_arg.mode = DOT11_CSA_MODE_ADVISORY;
 		csa_arg.count = P2P_ECSA_CNT;
 		csa_arg.reg = 0;
@@ -2561,6 +2574,10 @@ wl_cfgp2p_stop_p2p_device(struct wiphy *wiphy, struct wireless_dev *wdev)
 	if (!cfg->p2p)
 		return;
 
+#ifdef P2P_LISTEN_OFFLOADING
+	wl_cfg80211_p2plo_deinit(cfg);
+#endif /* P2P_LISTEN_OFFLOADING */
+
 	/* Cancel any on-going listen */
 	wl_cfgp2p_cancel_listen(cfg, bcmcfg_to_prmry_ndev(cfg), wdev, TRUE);
 
@@ -2582,11 +2599,16 @@ wl_cfgp2p_del_p2p_disc_if(struct wireless_dev *wdev, struct bcm_cfg80211 *cfg)
 	bool rollback_lock = false;
 
 	if (!wdev || !cfg) {
-		WL_ERR(("null ptr. wdev:%p cfg:%p\n", wdev, cfg));
+		WL_ERR(("wdev or cfg is NULL\n"));
 		return -EINVAL;
 	}
 
 	WL_INFORM(("Enter\n"));
+
+	if (!cfg->p2p_wdev) {
+		WL_ERR(("Already deleted p2p_wdev\n"));
+		return -EINVAL;
+	}
 
 	if (!rtnl_is_locked()) {
 		rtnl_lock();

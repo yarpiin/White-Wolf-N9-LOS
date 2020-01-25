@@ -23,7 +23,7 @@
  *
  * <<Broadcom-WL-IPTag/Open:>>
  *
- * $Id: wl_cfgnan.h 755932 2018-04-05 11:31:48Z $
+ * $Id: wl_cfgnan.h 792961 2018-12-06 10:16:54Z $
  */
 
 #ifndef _wl_cfgnan_h_
@@ -88,6 +88,7 @@
 	(num >= WL_NAN_EVENT_INVALID))
 #define NAN_INVALID_PROXD_EVENT(num)	(num != WLC_E_PROXD_NAN_EVENT)
 #define NAN_EVENT_BIT(event) (1U << (event - WL_NAN_EVENT_START))
+#define NAN_EVENT_MAP(event) ((event) - WL_NAN_EVENT_START)
 #define NAME_TO_STR(name) #name
 #define NAN_ID_CTRL_SIZE ((NAN_MAXIMUM_ID_NUMBER/8) + 1)
 
@@ -159,6 +160,7 @@
 #define NAN_MAX_SVC_INST (MAX_PUBLISHES + MAX_SUBSCRIBES)
 #define NAN_SVC_INST_SIZE 32u
 #define NAN_START_STOP_TIMEOUT	5000
+#define NAN_MAX_NDP_PEER 8u
 
 #ifdef WL_NAN_DEBUG
 #define NAN_MUTEX_LOCK() {WL_DBG(("Mutex Lock: Enter: %s\n", __FUNCTION__)); \
@@ -200,6 +202,9 @@
 #define	NAN_ATTR_SUB_SID_BEACON_CONFIG		(1<<28)
 #define NAN_IOVAR_NAME_SIZE	4u
 #define NAN_XTLV_ID_LEN_SIZE OFFSETOF(bcm_xtlv_t, data)
+#define NAN_RANGING_INDICATE_CONTINUOUS_MASK   0x01
+#define NAN_RANGE_REQ_CMD 0
+#define NAN_RNG_REQ_ACCEPTED_BY_HOST    1
 
 typedef uint32 nan_data_path_id;
 
@@ -207,8 +212,16 @@ typedef enum nan_stop_reason_code {
 	NAN_CONCURRENCY_CONFLICT = 0,
 	NAN_USER_INITIATED = 1,
 	NAN_BUS_IS_DOWN = 2,
-	NAN_DEINITIALIZED = 3
+	NAN_DEINITIALIZED = 3,
+	NAN_COUNTRY_CODE_CHANGE = 4
+
 } nan_stop_reason_code_t;
+
+typedef enum nan_range_types {
+	LEGACY_RTT = 0,
+	DIRECTED_NAN_RTT = 1,
+	GEOFENCE_NAN_RTT = 2
+} nan_range_types_t;
 
 typedef enum nan_range_status {
 	NAN_RANGING_INVALID = 0,
@@ -216,10 +229,19 @@ typedef enum nan_range_status {
 	NAN_RANGING_IN_PROGRESS = 2
 } nan_range_status_t;
 
+typedef enum nan_range_role {
+	NAN_RANGING_ROLE_INVALID = 0,
+	NAN_RANGING_ROLE_INITIATOR = 1,
+	NAN_RANGING_ROLE_RESPONDER = 2
+} nan_range_role_t;
+
 typedef struct nan_svc_inst {
 	uint8  inst_id;      /* publisher/subscriber id */
 	uint8  inst_type;    /* publisher/subscriber */
 } nan_svc_inst_t;
+
+/* Range Status Flag bits for svc info */
+#define SVC_RANGE_REP_EVENT_ONCE 0x01
 
 typedef struct nan_svc_info {
 	bool valid;
@@ -232,17 +254,49 @@ typedef struct nan_svc_info {
 	uint32 ranging_interval;
 	uint32 ingress_limit;
 	uint32 egress_limit;
+	uint32 flags;
 	uint8 tx_match_filter[MAX_MATCH_FILTER_LEN];        /* TX match filter */
 	uint8 tx_match_filter_len;
+	uint8 svc_range_status; /* For managing any svc range status flags */
 } nan_svc_info_t;
 
+/* NAN Peer DP state */
+typedef enum {
+	NAN_PEER_DP_NOT_CONNECTED = 0,
+	NAN_PEER_DP_CONNECTING = 1,
+	NAN_PEER_DP_CONNECTED = 2
+} nan_peer_dp_state_t;
+
+typedef struct nan_ndp_peer {
+	uint8 peer_dp_state;
+	uint8 dp_count;
+	struct ether_addr peer_addr;
+} nan_ndp_peer_t;
+
+#define INVALID_DISTANCE 0xFFFFFFFF
 typedef struct nan_ranging_inst {
-	uint8 svc_inst_id;
 	uint8 range_id;
 	nan_range_status_t range_status;
 	struct ether_addr peer_addr;
+	nan_range_types_t range_type;
+	uint8 num_svc_ctx;
+	nan_svc_info_t *svc_idx[MAX_SUBSCRIBES];
+	uint32 prev_distance_mm;
+	nan_range_role_t range_role;
 } nan_ranging_inst_t;
 
+#define DUMP_NAN_RTT_INST(inst) { printf("svc instance ID %d", (inst)->svc_inst_id); \
+	printf("Range ID %d", (inst)->range_id); \
+	printf("range_status %d", (inst)->range_status); \
+	printf("Range Type %d", (inst)->range_type); \
+	printf("Peer MAC "MACDBG"\n", MAC2STRDBG((inst)->peer_addr.octet)); \
+	}
+
+#define DUMP_NAN_RTT_RPT(rpt) { printf("Range ID %d", (rpt)->rng_id); \
+	printf("Distance in MM %d", (rpt)->dist_mm); \
+	printf("range_indication %d", (rpt)->indication); \
+	printf("Peer MAC "MACDBG"\n", MAC2STRDBG((rpt)->peer_m_addr.octet)); \
+	}
 /*
  * Data request Initiator/Responder
  * app/service related info
@@ -346,6 +400,7 @@ typedef struct nan_discover_cmd_data {
 	uint32 ttl;             /* time to live */
 	uint32 period;          /* publish period */
 	uint32 flags;           /* Flag bits */
+	bool sde_control_config; /* whether sde_control present */
 	uint16 sde_control_flag;
 	uint16 token; /* transmit fup token id */
 	uint8 csid;	/* cipher suite type */
@@ -647,6 +702,9 @@ extern int wl_cfgnan_data_path_end_handler(struct net_device *ndev,
 #ifdef WL_NAN_DISC_CACHE
 extern int wl_cfgnan_sec_info_handler(struct bcm_cfg80211 *cfg,
 	nan_datapath_sec_info_cmd_data_t *cmd_data, nan_hal_resp_t *nan_req_resp);
+/* ranging quest and response iovar handler */
+extern int wl_cfgnan_trigger_ranging(struct net_device *ndev,
+	struct bcm_cfg80211 *cfg, void *event_data, nan_svc_info_t *svc, uint8 range_req);
 #endif /* WL_NAN_DISC_CACHE */
 extern bool wl_cfgnan_is_dp_active(struct net_device *ndev);
 extern s32 wl_cfgnan_get_ndi_idx(struct bcm_cfg80211 *cfg);
@@ -654,6 +712,21 @@ extern s32 wl_cfgnan_add_ndi_data(struct bcm_cfg80211 *cfg, s32 idx, char *name)
 extern s32 wl_cfgnan_del_ndi_data(struct bcm_cfg80211 *cfg, char *name);
 extern struct wl_ndi_data *wl_cfgnan_get_ndi_data(struct bcm_cfg80211 *cfg, char *name);
 extern int wl_cfgnan_disable(struct bcm_cfg80211 *cfg, nan_stop_reason_code_t reason);
+extern nan_ranging_inst_t *wl_cfgnan_get_ranging_inst(struct bcm_cfg80211 *cfg,
+	struct ether_addr *peer, nan_range_role_t range_role);
+extern nan_ranging_inst_t* wl_cfgnan_check_for_ranging(struct bcm_cfg80211 *cfg,
+	struct ether_addr *peer);
+extern int wl_cfgnan_trigger_geofencing_ranging(struct net_device *dev,
+	struct ether_addr *peer_addr);
+extern int wl_cfgnan_suspend_geofence_rng_session(struct net_device *ndev, struct ether_addr *peer);
+extern nan_ndp_peer_t* wl_cfgnan_data_get_peer(struct bcm_cfg80211 *cfg,
+	struct ether_addr *peer_addr);
+void wl_cfgnan_data_set_peer_dp_state(struct bcm_cfg80211 *cfg,
+	struct ether_addr *peer_addr, nan_peer_dp_state_t state);
+extern bool wl_cfgnan_data_dp_exists(struct bcm_cfg80211 *cfg);
+int wl_cfgnan_terminate_directed_rtt_sessions(struct net_device *ndev, struct bcm_cfg80211 *cfg);
+void wl_cfgnan_reset_geofence_ranging(struct bcm_cfg80211 *cfg,
+	nan_ranging_inst_t * rng_inst);
 
 typedef enum {
 	NAN_ATTRIBUTE_HEADER                            = 100,

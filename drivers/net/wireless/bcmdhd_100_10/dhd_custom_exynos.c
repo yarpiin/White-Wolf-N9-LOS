@@ -23,7 +23,7 @@
  *
  * <<Broadcom-WL-IPTag/Open:>>
  *
- * $Id: dhd_custom_exynos.c 729025 2017-10-30 03:31:19Z $
+ * $Id: dhd_custom_exynos.c 823711 2019-06-05 05:09:51Z $
  */
 #include <linux/device.h>
 #include <linux/gpio.h>
@@ -47,9 +47,10 @@
 #include <linux/init.h>
 #include <linux/platform_device.h>
 #include <linux/wlan_plat.h>
-#if defined(CONFIG_SOC_EXYNOS8895) || defined(CONFIG_SOC_EXYNOS9810)
+#if defined(CONFIG_SOC_EXYNOS8895) || defined(CONFIG_SOC_EXYNOS9810) || \
+	defined(CONFIG_SOC_EXYNOS9820)
 #include <linux/exynos-pci-ctrl.h>
-#endif /* CONFIG_SOC_EXYNOS8895 || defined(CONFIG_SOC_EXYNOS9810) */
+#endif /* CONFIG_SOC_EXYNOS8895 || CONFIG_SOC_EXYNOS9810 || CONFIG_SOC_EXYNOS9820 */
 
 #if defined(CONFIG_64BIT)
 #include <asm-generic/gpio.h>
@@ -58,12 +59,15 @@
 #include <mach/gpio.h>
 #endif /* !CONFIG_ARCH_SWA100 && !CONFIG_MACH_UNIVERSAL7580 */
 #endif /* CONFIG_64BIT */
-
+#if defined(CONFIG_SEC_SYSFS)
 #if defined(CONFIG_MACH_UNIVERSAL7580) || defined(CONFIG_MACH_UNIVERSAL5430) || \
 	defined(CONFIG_MACH_UNIVERSAL5422)
 #include <mach/irqs.h>
 #endif /* CONFIG_MACH_UNIVERSAL7580 || CONFIG_MACH_UNIVERSAL5430 || CONFIG_MACH_UNIVERSAL5422 */
 #include <linux/sec_sysfs.h>
+#elif defined(CONFIG_DRV_SAMSUNG)
+#include <linux/sec_class.h>
+#endif /* CONFIG_SEC_SYSFS */
 
 #ifdef CONFIG_MACH_A7LTE
 #define PINCTL_DELAY 150
@@ -79,6 +83,7 @@ static int wlan_pwr_on = -1;
 #ifdef CONFIG_BCMDHD_OOB_HOST_WAKE
 static int wlan_host_wake_irq = 0;
 EXPORT_SYMBOL(wlan_host_wake_irq);
+static unsigned int wlan_host_wake_up = -1;
 #endif /* CONFIG_BCMDHD_OOB_HOST_WAKE */
 #ifdef CONFIG_MACH_A7LTE
 extern struct device *mmc_dev_for_wlan;
@@ -94,7 +99,7 @@ extern struct device *mmc_dev_for_wlan;
 #elif defined(CONFIG_MACH_UNIVERSAL7420) || defined(CONFIG_MACH_EXSOM7420)
 #define SAMSUNG_PCIE_CH_NUM 1
 #elif defined(CONFIG_SOC_EXYNOS8890)|| defined(CONFIG_SOC_EXYNOS8895) || \
-	defined(CONFIG_SOC_EXYNOS9810)
+	defined(CONFIG_SOC_EXYNOS9810) || defined(CONFIG_SOC_EXYNOS9820)
 #define SAMSUNG_PCIE_CH_NUM 0
 #endif // endif
 #ifdef CONFIG_MACH_UNIVERSAL5433
@@ -135,10 +140,11 @@ dhd_wlan_power(int onoff)
 	}
 
 	if (onoff) {
-#if defined(CONFIG_SOC_EXYNOS8895) || defined(CONFIG_SOC_EXYNOS9810)
+#if defined(CONFIG_SOC_EXYNOS8895) || defined(CONFIG_SOC_EXYNOS9810) || \
+	defined(CONFIG_SOC_EXYNOS9820)
 		printk(KERN_ERR "%s Disable L1ss EP side\n", __FUNCTION__);
 		exynos_pcie_l1ss_ctrl(0, PCIE_L1SS_CTRL_WIFI);
-#endif /* CONFIG_SOC_EXYNOS8895 || CONFIG_SOC_EXYNOS9810 */
+#endif /* CONFIG_SOC_EXYNOS8895 || CONFIG_SOC_EXYNOS9810 || CONFIG_SOC_EXYNOS9820 */
 		exynos_pcie_pm_resume(SAMSUNG_PCIE_CH_NUM);
 	}
 #else
@@ -204,9 +210,6 @@ dhd_wlan_init_gpio(void)
 {
 	const char *wlan_node = "samsung,brcm-wlan";
 	struct device_node *root_node = NULL;
-#ifdef CONFIG_BCMDHD_OOB_HOST_WAKE
-	unsigned int wlan_host_wake_up = -1;
-#endif /* CONFIG_BCMDHD_OOB_HOST_WAKE */
 	struct device *wlan_dev;
 
 	wlan_dev = sec_device_create(NULL, "wlan");
@@ -296,6 +299,16 @@ interrupt_set_cpucore(int set, unsigned int dpc_cpucore, unsigned int primary_cp
 	}
 }
 
+#if defined(CONFIG_BCMDHD_OOB_HOST_WAKE) && defined(CONFIG_BCMDHD_GET_OOB_STATE)
+int
+dhd_get_wlan_oob_gpio(void)
+{
+	return gpio_is_valid(wlan_host_wake_up) ?
+		gpio_get_value(wlan_host_wake_up) : -1;
+}
+EXPORT_SYMBOL(dhd_get_wlan_oob_gpio);
+#endif /* CONFIG_BCMDHD_OOB_HOST_WAKE && CONFIG_BCMDHD_GET_OOB_STATE */
+
 struct resource dhd_wlan_resources = {
 	.name	= "bcmdhd_wlan_irq",
 	.start	= 0,
@@ -352,7 +365,8 @@ fail:
 }
 
 #if defined(CONFIG_MACH_UNIVERSAL7420) || defined(CONFIG_SOC_EXYNOS8890) || \
-	defined(CONFIG_SOC_EXYNOS8895) || defined(CONFIG_SOC_EXYNOS9810)
+	defined(CONFIG_SOC_EXYNOS8895) || defined(CONFIG_SOC_EXYNOS9810) || \
+	defined(CONFIG_SOC_EXYNOS9820)
 #if defined(CONFIG_DEFERRED_INITCALLS)
 deferred_module_init(dhd_wlan_init);
 #else
@@ -360,6 +374,4 @@ late_initcall(dhd_wlan_init);
 #endif /* CONFIG_DEFERRED_INITCALLS */
 #else
 device_initcall(dhd_wlan_init);
-#endif /* CONFIG_MACH_UNIVERSAL7420 || CONFIG_SOC_EXYNOS8890 || \
-		  CONFIG_SOC_EXYNOS8895 || CONFIG_SOC_EXYNOS9810
-		*/
+#endif /* CONFIG Exynos PCIE Platforms */

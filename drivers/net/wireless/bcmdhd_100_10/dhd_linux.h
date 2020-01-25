@@ -24,7 +24,7 @@
  *
  * <<Broadcom-WL-IPTag/Open:>>
  *
- * $Id: dhd_linux.h 798798 2019-01-10 10:24:21Z $
+ * $Id: dhd_linux.h 799960 2019-01-18 06:51:12Z $
  */
 
 /* wifi platform functions for power, interrupt and pre-alloc, either
@@ -50,12 +50,16 @@
 #if defined(CONFIG_WIFI_CONTROL_FUNC)
 #include <linux/wlan_plat.h>
 #endif // endif
-
+#ifdef PCIE_FULL_DONGLE
+#include <etd.h>
+#endif /* PCIE_FULL_DONGLE */
 #ifdef WL_MONITOR
 #include <bcmmsgbuf.h>
 #define MAX_RADIOTAP_SIZE      256 /* Maximum size to hold HE Radiotap header format */
 #define MAX_MON_PKT_SIZE       (4096 + MAX_RADIOTAP_SIZE)
 #endif /* WL_MONITOR */
+
+#define FILE_DUMP_MAX_WAIT_TIME 4000
 
 #define htod32(i) (i)
 #define htod16(i) (i)
@@ -124,6 +128,10 @@ typedef struct dhd_if {
 	struct delayed_work m4state_work;
 	atomic_t m4state;
 #endif /* DHD_4WAYM4_FAIL_DISCONNECT */
+#ifdef DHD_POST_EAPOL_M1_AFTER_ROAM_EVT
+	bool recv_reassoc_evt;
+	bool post_roam_evt;
+#endif /* DHD_POST_EAPOL_M1_AFTER_ROAM_EVT */
 #ifdef DHDTCPSYNC_FLOOD_BLK
 	uint32 tsync_rcvd;
 	uint32 tsyncack_txed;
@@ -144,6 +152,13 @@ typedef struct dhd_dump {
 	uint8 *hscb_buf;
 	int hscb_bufsize;
 } dhd_dump_t;
+#ifdef DNGL_AXI_ERROR_LOGGING
+typedef struct dhd_axi_error_dump {
+	ulong fault_address;
+	uint32 axid;
+	struct hnd_ext_trap_axi_error_v1 etd_axi_error_v1;
+} dhd_axi_error_dump_t;
+#endif /* DNGL_AXI_ERROR_LOGGING */
 
 #ifdef DHD_PCIE_NATIVE_RUNTIMEPM
 struct dhd_rx_tx_work {
@@ -270,6 +285,14 @@ typedef struct dhd_sta {
 } dhd_sta_t;
 typedef dhd_sta_t dhd_sta_pool_t;
 
+#ifdef DHD_4WAYM4_FAIL_DISCONNECT
+typedef enum {
+	M3_RXED,
+	M4_TXFAILED
+} msg_4way_state_t;
+#define MAX_4WAY_TIMEOUT_MS 2000
+#endif /* DHD_4WAYM4_FAIL_DISCONNECT */
+
 #ifdef CUSTOMER_HW4
 #ifdef MIMO_ANT_SETTING
 #ifdef DHD_EXPORT_CNTL_FILE
@@ -306,15 +329,14 @@ extern uint32 sec_save_softap_info(void);
 extern uint32 report_hang_privcmd_err;
 #endif /* DHD_SEND_HANG_PRIVCMD_ERRORS */
 
-#if defined(ARGOS_CPU_SCHEDULER) && !defined(DHD_LB_IRQSET) && \
-	!defined(CONFIG_SOC_EXYNOS7870)
+#if defined(ARGOS_CPU_SCHEDULER) && !defined(DHD_LB_IRQSET)
 extern int argos_task_affinity_setup_label(struct task_struct *p, const char *label,
 	struct cpumask * affinity_cpu_mask, struct cpumask * default_cpu_mask);
 extern struct cpumask hmp_slow_cpu_mask;
 extern struct cpumask hmp_fast_cpu_mask;
 extern void set_irq_cpucore(unsigned int irq, cpumask_var_t default_cpu_mask,
 	cpumask_var_t affinity_cpu_mask);
-#endif /* ARGOS_CPU_SCHEDULER && !DHD_LB_IRQSET && !CONFIG_SOC_EXYNOS7870 */
+#endif /* ARGOS_CPU_SCHEDULER && !DHD_LB_IRQSET */
 
 #if (defined(ARGOS_CPU_SCHEDULER) && defined(ARGOS_RPS_CPU_CTL)) || \
 	defined(ARGOS_NOTIFY_CB)
@@ -329,23 +351,8 @@ typedef struct {
 	int argos_rps_cpus_enabled;
 } argos_rps_ctrl;
 
-#ifdef DYNAMIC_MUMIMO_CONTROL
-typedef struct {
-	struct timer_list config_timer;
-	struct work_struct mumimo_ctrl_work;
-	struct net_device *dev;
-	int cur_murx_bfe_cap;
-} argos_mumimo_ctrl;
-#endif /* DYNAMIC_MUMIMO_CONTROL */
-
-#ifdef BCMPCIE
 #define RPS_TPUT_THRESHOLD		300
-#else
-#define RPS_TPUT_THRESHOLD			150
-#endif /* BCMPCIE */
 #define DELAY_TO_CLEAR_RPS_CPUS		300
-#define SUMIMO_TO_MUMIMO_TPUT_THRESHOLD		0
-#define MUMIMO_TO_SUMIMO_TPUT_THRESHOLD		150
 #endif /* (ARGOS_RPS_CPU_CTL && ARGOS_CPU_SCHEDULER) || ARGOS_NOTIFY_CB */
 
 #if defined(BT_OVER_SDIO)
@@ -384,6 +391,13 @@ typedef struct {
 	log_dump_section_type_t sec_type;
 } dld_hdr_t;
 
+typedef struct {
+	int attr;
+	char *hdr_str;
+	log_dump_section_type_t sec_type;
+	int log_type;
+} dld_log_hdr_t;
+
 #define DHD_PRINT_BUF_NAME_LEN 30
 #endif /* DHD_LOG_DUMP */
 
@@ -417,10 +431,11 @@ int dhd_net_bus_put(struct net_device *dev);
 
 int dhd_enable_adps(dhd_pub_t *dhd, uint8 on);
 #endif /* WLADPS || WLADPS_PRIVATE_CMD */
-#ifdef DHD_DISABLE_VHTMODE
-extern void dhd_disable_vhtmode(dhd_pub_t *dhd);
-#endif /* DHD_DISABLE_VHTMODE */
 #ifdef DHDTCPSYNC_FLOOD_BLK
+extern void dhd_reset_tcpsync_info_by_ifp(dhd_if_t *ifp);
 extern void dhd_reset_tcpsync_info_by_dev(struct net_device *dev);
 #endif /* DHDTCPSYNC_FLOOD_BLK */
+
+int compat_kernel_read(struct file *file, loff_t offset, char *addr, unsigned long count);
+
 #endif /* __DHD_LINUX_H__ */

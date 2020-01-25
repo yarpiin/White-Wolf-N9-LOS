@@ -24,7 +24,7 @@
  *
  * <<Broadcom-WL-IPTag/Open:>>
  *
- * $Id: wl_android.h 695651 2017-04-21 10:48:20Z $
+ * $Id: wl_android.h 787670 2018-11-05 11:00:28Z $
  */
 
 #include <linux/module.h>
@@ -137,3 +137,30 @@ s32 wl_netlink_send_msg(int pid, int type, int seq, const void *data, size_t siz
 #define MAX_NUM_MAC_FILT        10
 
 int wl_android_set_ap_mac_list(struct net_device *dev, int macmode, struct maclist *maclist);
+#ifdef WL_BCNRECV
+extern int wl_android_bcnrecv_config(struct net_device *ndev, char *data,
+		int total_len);
+extern int wl_android_bcnrecv_stop(struct net_device *ndev, uint reason);
+extern int wl_android_bcnrecv_resume(struct net_device *ndev);
+extern int wl_android_bcnrecv_suspend(struct net_device *ndev);
+extern int wl_android_bcnrecv_event(struct net_device *ndev,
+		uint attr_type, uint status, uint reason, uint8 *data, uint data_len);
+#endif /* WL_BCNRECV */
+#ifdef WL_CAC_TS
+#define TSPEC_UPLINK_DIRECTION (0 << 5)	/* uplink direction traffic stream */
+#define TSPEC_DOWNLINK_DIRECTION (1 << 5)	/* downlink direction traffic stream */
+#define TSPEC_BI_DIRECTION (3 << 5)	/* bi direction traffic stream */
+#define TSPEC_EDCA_ACCESS (1 << 7)	/* EDCA access policy */
+#define TSPEC_UAPSD_PSB (1 << 2)		/* U-APSD power saving behavior */
+#define TSPEC_TSINFO_TID_SHIFT 1		/* TID Shift */
+#define TSPEC_TSINFO_PRIO_SHIFT 3		/* PRIO Shift */
+#define TSPEC_MAX_ACCESS_CATEGORY 3
+#define TSPEC_MAX_USER_PRIO	7
+#define TSPEC_MAX_DIALOG_TOKEN	255
+#define TSPEC_MAX_SURPLUS_BW 12410
+#define TSPEC_MIN_SURPLUS_BW 11210
+#define TSPEC_MAX_MSDU_SIZE 1520
+#define TSPEC_DEF_MEAN_DATA_RATE 120000
+#define TSPEC_DEF_MIN_PHY_RATE 6000000
+#define TSPEC_DEF_DIALOG_TOKEN 7
+#endif /* WL_CAC_TS */

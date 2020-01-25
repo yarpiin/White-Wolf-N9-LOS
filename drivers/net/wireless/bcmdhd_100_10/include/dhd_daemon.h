@@ -24,7 +24,7 @@
  *
  * <<Broadcom-WL-IPTag/Open:>>
  *
- * $Id: dhd_daemon.h 671442 2016-11-22 05:16:18Z $
+ * $Id: dhd_daemon.h 776022 2018-08-10 09:27:26Z $
  */
 
 #ifndef __BCM_DHDD_H__
@@ -40,6 +40,7 @@
 #define NO_TRAP 0
 #define DO_TRAP	1
 
+#define BCM_NL_TS   30
 #define BCM_NL_USER 31
 
 typedef enum notify_dhd_daemon_reason {

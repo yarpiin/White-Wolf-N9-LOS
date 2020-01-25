@@ -33,7 +33,7 @@
 extern void wl_mschdbg_event_handler(dhd_pub_t *dhdp, void *raw_event_ptr, int type,
 	void *data, int len);
 extern void wl_mschdbg_verboselog_handler(dhd_pub_t *dhdp, void *raw_event_ptr,
-	event_log_hdr_t *log_hdr, uint32 *log_ptr);
+	prcd_event_log_hdr_t *plog_hdr, uint32 *log_ptr);
 #endif /* SHOW_LOGTRACE */
 
 #endif /* _dhd_mschdbg_h_ */

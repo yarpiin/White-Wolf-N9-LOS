@@ -1,5 +1,7 @@
 /*
- * Broadcom Event  protocol definitions
+ * Broadcom Event protocol definitions
+ *
+ * Dependencies: bcmeth.h
  *
  * Copyright (C) 1999-2019, Broadcom.
  *
@@ -21,11 +23,10 @@
  * software in any way with any other Broadcom software provided under a license
  * other than the GPL, without Broadcom's express prior written consent.
  *
- * Dependencies: bcmeth.h
- *
- * $Id: dnglevent.h $
  *
  * <<Broadcom-WL-IPTag/Open:>>
+ *
+ * $Id: dnglevent.h $
  *
  * -----------------------------------------------------------------------------
  *

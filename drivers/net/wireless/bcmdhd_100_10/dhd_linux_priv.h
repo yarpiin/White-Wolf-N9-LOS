@@ -24,7 +24,7 @@
  *
  * <<Broadcom-WL-IPTag/Open:>>
  *
- * $Id: dhd_linux_priv.h 788666 2018-11-13 11:37:36Z $
+ * $Id: dhd_linux_priv.h 823742 2019-06-05 08:37:45Z $
  */
 
 #ifndef __DHD_LINUX_PRIV_H__
@@ -80,7 +80,7 @@ typedef struct dhd_info {
 	wait_queue_head_t dmaxfer_wait;
 	uint32	default_wd_interval;
 
-	struct timer_list timer;
+	timer_list_compat_t timer;
 	bool wd_timer_valid;
 #ifdef DHD_PCIE_RUNTIMEPM
 	struct timer_list rpm_timer;
@@ -357,15 +357,14 @@ typedef struct dhd_info {
 	struct mutex logdump_lock;
 	/* indicates mem_dump was scheduled as work queue or called directly */
 	bool scheduled_memdump;
-	/* indicates sssrdump is called directly instead of scheduling work queue */
-	bool no_wq_sssrdump;
-#ifdef DHD_PKTTS
-	bool latency; /* pktts enab flag */
-	pktts_flow_t config[PKTTS_CONFIG_MAX]; /* pktts user config */
-#endif /* DHD_PKTTS */
 	struct work_struct dhd_hang_process_work;
+#ifdef DHD_HP2P
+	spinlock_t	hp2p_lock;
+#endif /* DHD_HP2P */
 } dhd_info_t;
 
 extern int dhd_sysfs_init(dhd_info_t *dhd);
 extern void dhd_sysfs_exit(dhd_info_t *dhd);
+extern void dhd_dbg_ring_proc_create(dhd_pub_t *dhdp);
+extern void dhd_dbg_ring_proc_destroy(dhd_pub_t *dhdp);
 #endif /* __DHD_LINUX_PRIV_H__ */

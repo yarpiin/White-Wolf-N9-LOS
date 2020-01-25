@@ -24,16 +24,11 @@
  *
  * <<Broadcom-WL-IPTag/Open:>>
  *
- * $Id: wl_cfgvendor.h 740003 2018-01-10 10:47:17Z $
+ * $Id: wl_cfgvendor.h 791030 2018-11-28 02:28:48Z $
  */
 
 #ifndef _wl_cfgvendor_h_
 #define _wl_cfgvendor_h_
-#if ((LINUX_VERSION_CODE > KERNEL_VERSION(3, 14, 0)) || \
-	defined(CONFIG_BCMDHD_VENDOR_EXT)) && !defined(WL_VENDOR_EXT_SUPPORT)
-/* defined CONFIG_BCMDHD_VENDOR_EXT in brix kernel to enable GSCAN testing */
-#define WL_VENDOR_EXT_SUPPORT
-#endif /* LINUX_VERSION_CODE > KERNEL_VERSION(3, 14, 0) && CONFIG_BCMDHD_VENDOR_EXT */
 
 #define OUI_BRCM    0x001018
 #define OUI_GOOGLE  0x001A11
@@ -43,8 +38,15 @@
 #define VENDOR_DATA_OVERHEAD               (NLA_HDRLEN)
 
 enum brcm_vendor_attr {
-	BRCM_ATTR_DRIVER_CMD,
-	BRCM_ATTR_DRIVER_MAX
+	BRCM_ATTR_DRIVER_CMD		= 0,
+	BRCM_ATTR_DRIVER_KEY_PMK	= 1,
+	BRCM_ATTR_DRIVER_FEATURE_FLAGS	= 2,
+	BRCM_ATTR_DRIVER_MAX		= 3
+};
+
+enum brcm_wlan_vendor_features {
+	BRCM_WLAN_VENDOR_FEATURE_KEY_MGMT_OFFLOAD	= 0,
+	BRCM_WLAN_VENDOR_FEATURES_MAX			= 1
 };
 
 #define SCAN_RESULTS_COMPLETE_FLAG_LEN       ATTRIBUTE_U32_LEN
@@ -83,6 +85,9 @@ enum brcm_vendor_attr {
 #define NAN_SID_ENABLE_FLAG_INVALID	0xff
 #define NAN_SID_BEACON_COUNT_INVALID	0xff
 #define WL_NAN_DW_INTERVAL 512
+
+#define CFG80211_VENDOR_CMD_REPLY_SKB_SZ	100
+#define CFG80211_VENDOR_EVT_SKB_SZ			2048
 
 typedef enum {
 	/* don't use 0 as a valid subcommand */
@@ -182,6 +187,10 @@ enum andr_vendor_subcmd {
 	DEBUG_GET_TX_PKT_FATES,
 	DEBUG_GET_RX_PKT_FATES,
 	DEBUG_GET_WAKE_REASON_STATS,
+	DEBUG_GET_FILE_DUMP_BUF,
+	DEBUG_FILE_DUMP_DONE_IND,
+	DEBUG_SET_HAL_START,
+	DEBUG_SET_HAL_STOP,
 
 	WIFI_OFFLOAD_SUBCMD_START_MKEEP_ALIVE = ANDROID_NL80211_SUBCMD_WIFI_OFFLOAD_RANGE_START,
 	WIFI_OFFLOAD_SUBCMD_STOP_MKEEP_ALIVE,
@@ -376,6 +385,12 @@ enum wifi_rssi_monitor_attr {
 	RSSI_MONITOR_ATTRIBUTE_START
 };
 
+enum wifi_sae_key_attr {
+	BRCM_SAE_KEY_ATTR_PEER_MAC,
+	BRCM_SAE_KEY_ATTR_PMK,
+	BRCM_SAE_KEY_ATTR_PMKID
+};
+
 enum debug_attributes {
 	DEBUG_ATTRIBUTE_GET_DRIVER,
 	DEBUG_ATTRIBUTE_GET_FW,
@@ -385,6 +400,7 @@ enum debug_attributes {
 	DEBUG_ATTRIBUTE_LOG_LEVEL,
 	DEBUG_ATTRIBUTE_LOG_TIME_INTVAL,
 	DEBUG_ATTRIBUTE_LOG_MIN_DATA_SIZE,
+	DEBUG_ATTRIBUTE_DUMP_FILENAME,
 	DEBUG_ATTRIBUTE_FW_DUMP_LEN,
 	DEBUG_ATTRIBUTE_FW_DUMP_DATA,
 	DEBUG_ATTRIBUTE_RING_DATA,
@@ -395,6 +411,65 @@ enum debug_attributes {
 	DEBUG_ATTRIBUTE_PKT_FATE_NUM,
 	DEBUG_ATTRIBUTE_PKT_FATE_DATA
 };
+
+typedef enum {
+	DUMP_LEN_ATTR_INVALID,
+	DUMP_LEN_ATTR_MEMDUMP,
+	DUMP_LEN_ATTR_SSSR_C0_D11_BEFORE,
+	DUMP_LEN_ATTR_SSSR_C0_D11_AFTER,
+	DUMP_LEN_ATTR_SSSR_C1_D11_BEFORE,
+	DUMP_LEN_ATTR_SSSR_C1_D11_AFTER,
+	DUMP_LEN_ATTR_SSSR_DIG_BEFORE,
+	DUMP_LEN_ATTR_SSSR_DIG_AFTER,
+	DUMP_LEN_ATTR_TIMESTAMP,
+	DUMP_LEN_ATTR_GENERAL_LOG,
+	DUMP_LEN_ATTR_ECNTRS,
+	DUMP_LEN_ATTR_SPECIAL_LOG,
+	DUMP_LEN_ATTR_DHD_DUMP,
+	DUMP_LEN_ATTR_EXT_TRAP,
+	DUMP_LEN_ATTR_HEALTH_CHK,
+	DUMP_LEN_ATTR_PRESERVE_LOG,
+	DUMP_LEN_ATTR_COOKIE,
+	DUMP_LEN_ATTR_FLOWRING_DUMP,
+	DUMP_LEN_ATTR_PKTLOG,
+	DUMP_FILENAME_ATTR_DEBUG_DUMP,
+	DUMP_FILENAME_ATTR_MEM_DUMP,
+	DUMP_FILENAME_ATTR_SSSR_CORE_0_BEFORE_DUMP,
+	DUMP_FILENAME_ATTR_SSSR_CORE_0_AFTER_DUMP,
+	DUMP_FILENAME_ATTR_SSSR_CORE_1_BEFORE_DUMP,
+	DUMP_FILENAME_ATTR_SSSR_CORE_1_AFTER_DUMP,
+	DUMP_FILENAME_ATTR_SSSR_DIG_BEFORE_DUMP,
+	DUMP_FILENAME_ATTR_SSSR_DIG_AFTER_DUMP,
+	DUMP_FILENAME_ATTR_PKTLOG_DUMP,
+	DUMP_LEN_ATTR_STATUS_LOG,
+	DUMP_LEN_ATTR_AXI_ERROR,
+	DUMP_FILENAME_ATTR_AXI_ERROR_DUMP
+} EWP_DUMP_EVENT_ATTRIBUTE;
+
+/* Attributes associated with DEBUG_GET_DUMP_BUF */
+typedef enum {
+	DUMP_BUF_ATTR_INVALID,
+	DUMP_BUF_ATTR_MEMDUMP,
+	DUMP_BUF_ATTR_SSSR_C0_D11_BEFORE,
+	DUMP_BUF_ATTR_SSSR_C0_D11_AFTER,
+	DUMP_BUF_ATTR_SSSR_C1_D11_BEFORE,
+	DUMP_BUF_ATTR_SSSR_C1_D11_AFTER,
+	DUMP_BUF_ATTR_SSSR_DIG_BEFORE,
+	DUMP_BUF_ATTR_SSSR_DIG_AFTER,
+	DUMP_BUF_ATTR_TIMESTAMP,
+	DUMP_BUF_ATTR_GENERAL_LOG,
+	DUMP_BUF_ATTR_ECNTRS,
+	DUMP_BUF_ATTR_SPECIAL_LOG,
+	DUMP_BUF_ATTR_DHD_DUMP,
+	DUMP_BUF_ATTR_EXT_TRAP,
+	DUMP_BUF_ATTR_HEALTH_CHK,
+	DUMP_BUF_ATTR_PRESERVE_LOG,
+	DUMP_BUF_ATTR_COOKIE,
+	DUMP_BUF_ATTR_FLOWRING_DUMP,
+	DUMP_BUF_ATTR_PKTLOG,
+	DUMP_BUF_ATTR_STATUS_LOG,
+	DUMP_BUF_ATTR_AXI_ERROR
+} EWP_DUMP_CMD_ATTRIBUTE;
 
 enum mkeep_alive_attributes {
 	MKEEP_ALIVE_ATTRIBUTE_ID,
@@ -444,10 +519,12 @@ typedef enum wl_vendor_event {
 	GOOGLE_NAN_EVENT_TCA			= 29,
 	GOOGLE_NAN_EVENT_SUBSCRIBE_UNMATCH	= 30,
 	GOOGLE_NAN_EVENT_UNKNOWN		= 31,
-
 	GOOGLE_ROAM_EVENT_START			= 32,
-
-	BRCM_VENDOR_EVENT_HANGED		= 33
+	BRCM_VENDOR_EVENT_HANGED                = 33,
+	BRCM_VENDOR_EVENT_SAE_KEY               = 34,
+	BRCM_VENDOR_EVENT_BEACON_RECV           = 35,
+	BRCM_VENDOR_EVENT_PORT_AUTHORIZED       = 36,
+	GOOGLE_FILE_DUMP_EVENT			= 37
 } wl_vendor_event_t;
 
 enum andr_wifi_attr {
@@ -564,6 +641,7 @@ typedef struct wifi_roaming_capabilities {
 
 /* Capture the BRCM_VENDOR_SUBCMD_PRIV_STRINGS* here */
 #define BRCM_VENDOR_SCMD_CAPA	"cap"
+#define MEMDUMP_PATH_LEN	128
 
 #if (LINUX_VERSION_CODE > KERNEL_VERSION(3, 13, 0)) || defined(WL_VENDOR_EXT_SUPPORT)
 extern int wl_cfgvendor_attach(struct wiphy *wiphy, dhd_pub_t *dhd);
@@ -576,17 +654,28 @@ extern int wl_cfgvendor_send_hotlist_event(struct wiphy *wiphy,
 static INLINE int wl_cfgvendor_attach(struct wiphy *wiphy,
 		dhd_pub_t *dhd) { UNUSED_PARAMETER(wiphy); UNUSED_PARAMETER(dhd); return 0; }
 static INLINE int wl_cfgvendor_detach(struct wiphy *wiphy) { UNUSED_PARAMETER(wiphy); return 0; }
+static INLINE int wl_cfgvendor_send_async_event(struct wiphy *wiphy,
+                  struct net_device *dev, int event_id, const void  *data, int len)
+{ return 0; }
+static INLINE int wl_cfgvendor_send_hotlist_event(struct wiphy *wiphy,
+                struct net_device *dev, void  *data, int len, wl_vendor_event_t event)
+{ return 0; }
 #endif /*  (LINUX_VERSION_CODE > KERNEL_VERSION(3, 13, 0)) || defined(WL_VENDOR_EXT_SUPPORT) */
 
 #if defined(WL_SUPP_EVENT) && ((LINUX_VERSION_CODE > KERNEL_VERSION(3, 13, 0)) || \
 	defined(WL_VENDOR_EXT_SUPPORT))
 extern int wl_cfgvendor_send_supp_eventstring(const char *func, const char *fmt, ...);
+int wl_cfgvendor_notify_supp_event_str(const char *evt_name, const char *fmt, ...);
 #define SUPP_LOG_LEN 256
 #define PRINT_SUPP_LOG(fmt, ...) \
 	 wl_cfgvendor_send_supp_eventstring(__func__, fmt, ##__VA_ARGS__);
 #define SUPP_LOG(args)	PRINT_SUPP_LOG	args;
+#define SUPP_EVT_LOG(evt_name, fmt, ...) \
+	wl_cfgvendor_notify_supp_event_str(evt_name, fmt, ##__VA_ARGS__);
+#define SUPP_EVENT(args) SUPP_EVT_LOG args
 #else
 #define SUPP_LOG(x)
+#define SUPP_EVENT(x)
 #endif /* WL_SUPP_EVENT && ((kernel > (3, 13, 0)) || WL_VENDOR_EXT_SUPPORT) */
 
 #ifdef CONFIG_COMPAT
@@ -602,5 +691,22 @@ extern int wl_cfgvendor_send_supp_eventstring(const char *func, const char *fmt,
 #define COMPAT_ASSIGN_VALUE(normal_structure, member, value) \
 	normal_structure.member = value;
 #endif /* CONFIG_COMPAT */
+#ifdef WL_BCNRECV
+#if (defined(CONFIG_ARCH_MSM) && defined(SUPPORT_WDEV_CFG80211_VENDOR_EVENT_ALLOC)) || \
+	LINUX_VERSION_CODE >= KERNEL_VERSION(4, 1, 0)
+#define CFG80211_VENDOR_EVENT_ALLOC(wiphy, wdev, len, type, kflags) \
+	cfg80211_vendor_event_alloc(wiphy, ndev_to_wdev(ndev), len, \
+			BRCM_VENDOR_EVENT_BEACON_RECV, kflags);
+#else
+#define CFG80211_VENDOR_EVENT_ALLOC(wiphy, wdev, len, type, kflags) \
+	cfg80211_vendor_event_alloc(wiphy, len, BRCM_VENDOR_EVENT_BEACON_RECV, kflags);
+#endif /* (defined(CONFIG_ARCH_MSM) && defined(SUPPORT_WDEV_CFG80211_VENDOR_EVENT_ALLOC)) || */
+		/* LINUX_VERSION_CODE >= KERNEL_VERSION(4, 1, 0) */
+#endif /* WL_BCNRECV */
 
+#ifdef WL_CFGVENDOR_SEND_HANG_EVENT
+void wl_cfgvendor_send_hang_event(struct net_device *dev, u16 reason, char *string,
+	int hang_info_cnt);
+void wl_copy_hang_info_if_falure(struct net_device *dev, u16 reason, s32 ret);
+#endif /* WL_CFGVENDOR_SEND_HANG_EVENT */
 #endif /* _wl_cfgvendor_h_ */
