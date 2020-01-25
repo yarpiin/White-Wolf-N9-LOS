@@ -174,6 +174,7 @@ int mdnie_current_state(struct mdnie_info *mdnie)
              mdnie_mode == MDNIE_COLOR_LENS_MODE ||
              mdnie_mode == MDNIE_DMB_MODE ||
              mdnie_mode == MDNIE_HDR_MODE ||
+             mdnie_mode == MDNIE_LIGHT_NOTIFICATION_MODE ||
              mdnie_mode == MDNIE_HMD_MODE)) {
 		pr_debug("%s block mdnie (%s->%s) in doze mode\n",
 				__func__, mdnie_mode_name[mdnie_mode],
@@ -484,19 +485,9 @@ static void scr_white_maptbls_init(struct mdnie_info *mdnie)
 		maptbl_init(&mdnie->scr_white_maptbl[i]);
 }
 
-static bool stop_samsung;
 static void mdnie_update_scr_white_mode(struct mdnie_info *mdnie)
 {
 	int mdnie_mode = mdnie_current_state(mdnie);
-
-	if (stop_samsung) {
-		if (mdnie->props.update_sensorRGB) {
-			mdnie->props.scr_white_mode = SCR_WHITE_MODE_SENSOR_RGB;
-			mdnie->props.update_sensorRGB = false;
-		}
-
-		return;
-	}
 
 	if (mdnie_mode == MDNIE_SCENARIO_MODE) {
 		if ((IS_LDU_MODE(mdnie)) && (mdnie->props.scenario != EBOOK_MODE)) {
@@ -648,7 +639,7 @@ static ssize_t scenario_store(struct device *dev,
 		struct device_attribute *attr, const char *buf, size_t count)
 {
 	struct mdnie_info *mdnie = dev_get_drvdata(dev);
-	unsigned int value;
+	unsigned int value = 0;
 	int ret;
 
 	ret = kstrtouint(buf, 0, &value);
@@ -683,7 +674,7 @@ static ssize_t accessibility_store(struct device *dev,
 {
 	struct mdnie_info *mdnie = dev_get_drvdata(dev);
 	unsigned int s[12] = {0, };
-	int i, value, ret;
+	int i, value = 0, ret;
 
 	ret = sscanf(buf, "%d %x %x %x %x %x %x %x %x %x %x %x %x",
 		&value, &s[0], &s[1], &s[2], &s[3],
@@ -733,7 +724,7 @@ static ssize_t bypass_store(struct device *dev,
 		struct device_attribute *attr, const char *buf, size_t count)
 {
 	struct mdnie_info *mdnie = dev_get_drvdata(dev);
-	unsigned int value;
+	unsigned int value = 0;
 	int ret;
 
 	ret = kstrtouint(buf, 0, &value);
@@ -768,7 +759,7 @@ static ssize_t lux_store(struct device *dev,
 		struct device_attribute *attr, const char *buf, size_t count)
 {
 	struct mdnie_info *mdnie = dev_get_drvdata(dev);
-	int ret, value;
+	int ret, value = 0;
 
 	ret = kstrtoint(buf, 0, &value);
 	if (ret < 0)
@@ -887,7 +878,7 @@ static ssize_t sensorRGB_store(struct device *dev,
 		struct device_attribute *attr, const char *buf, size_t count)
 {
 	struct mdnie_info *mdnie = dev_get_drvdata(dev);
-	unsigned int white_red, white_green, white_blue;
+	unsigned int white_red = 0, white_green = 0, white_blue = 0;
 	int mdnie_mode = mdnie_current_state(mdnie), ret;
 
 	ret = sscanf(buf, "%d %d %d",
@@ -928,7 +919,7 @@ static ssize_t whiteRGB_store(struct device *dev,
 		struct device_attribute *attr, const char *buf, size_t count)
 {
 	struct mdnie_info *mdnie = dev_get_drvdata(dev);
-	int wr_offset, wg_offset, wb_offset;
+	int wr_offset = 0, wg_offset = 0, wb_offset = 0;
 	int ret;
 
 	ret = sscanf(buf, "%d %d %d",
@@ -970,7 +961,7 @@ static ssize_t night_mode_store(struct device *dev,
 		struct device_attribute *attr, const char *buf, size_t count)
 {
 	struct mdnie_info *mdnie = dev_get_drvdata(dev);
-	int enable, level, ret;
+	int enable = 0, level = 0, ret;
 
 	ret = sscanf(buf, "%d %d", &enable, &level);
 
@@ -1011,7 +1002,7 @@ static ssize_t color_lens_store(struct device *dev,
 		struct device_attribute *attr, const char *buf, size_t count)
 {
 	struct mdnie_info *mdnie = dev_get_drvdata(dev);
-	int enable, level, color, ret;
+	int enable = 0, level = 0, color = 0, ret;
 
 	ret = sscanf(buf, "%d %d %d", &enable, &color, &level);
 
@@ -1053,7 +1044,7 @@ static ssize_t hdr_store(struct device *dev,
 		struct device_attribute *attr, const char *buf, size_t count)
 {
 	struct mdnie_info *mdnie = dev_get_drvdata(dev);
-	unsigned int value;
+	unsigned int value = 0;
 	int ret;
 
 	ret = kstrtouint(buf, 0, &value);
@@ -1086,7 +1077,7 @@ static ssize_t light_notification_store(struct device *dev,
 		struct device_attribute *attr, const char *buf, size_t count)
 {
 	struct mdnie_info *mdnie = dev_get_drvdata(dev);
-	unsigned int value;
+	unsigned int value = 0;
 	int ret;
 
 	ret = kstrtouint(buf, 0, &value);
@@ -1120,7 +1111,7 @@ static ssize_t mdnie_ldu_store(struct device *dev,
 		struct device_attribute *attr, const char *buf, size_t count)
 {
 	struct mdnie_info *mdnie = dev_get_drvdata(dev);
-	int value, ret;
+	int value = 0, ret;
 
 	ret = kstrtoint(buf, 10, &value);
 
@@ -1155,7 +1146,7 @@ static ssize_t hmt_color_temperature_store(struct device *dev,
 		struct device_attribute *attr, const char *buf, size_t count)
 {
 	struct mdnie_info *mdnie = dev_get_drvdata(dev);
-	unsigned int value;
+	unsigned int value = 0;
 	int ret;
 
 	ret = kstrtouint(buf, 0, &value);
@@ -1200,7 +1191,7 @@ static ssize_t afc_store(struct device *dev,
 {
 	struct mdnie_info *mdnie = dev_get_drvdata(dev);
 	unsigned int s[12] = {0, };
-	int value, ret;
+	int value = 0, ret;
 	size_t i;
 
 	ret = sscanf(buf, "%i %i %i %i %i %i %i %i %i %i %i %i %i",
@@ -1228,44 +1219,6 @@ static ssize_t afc_store(struct device *dev,
 }
 #endif
 
-static ssize_t rgb_show(struct device *dev,
-		struct device_attribute *attr, char *buf)
-{
-	struct mdnie_info *mdnie = dev_get_drvdata(dev);
-
-	return snprintf(buf, PAGE_SIZE, "%d %d %d\n", mdnie->props.cur_wrgb[0],
-			mdnie->props.cur_wrgb[1], mdnie->props.cur_wrgb[2]);
-}
-
-static ssize_t rgb_store(struct device *dev,
-		struct device_attribute *attr, const char *buf, size_t count)
-{
-	struct mdnie_info *mdnie = dev_get_drvdata(dev);
-	unsigned int white_red, white_green, white_blue;
-	int ret;
-
-	ret = sscanf(buf, "%d %d %d",
-		&white_red, &white_green, &white_blue);
-	if (ret < 0)
-		return ret;
-
-	 dev_info(dev, "%s, white_r %d, white_g %d, white_b %d\n",
-			 __func__, white_red, white_green, white_blue);
-
-	stop_samsung = !(white_red == 255 && white_green == 255 && white_blue == 255);
-
-	mutex_lock(&mdnie->lock);
-	mdnie->props.ssr_wrgb[0] = white_red;
-	mdnie->props.ssr_wrgb[1] = white_green;
-	mdnie->props.ssr_wrgb[2] = white_blue;
-	mdnie->props.update_sensorRGB = true;
-	scr_white_maptbl_init(mdnie, MDNIE_SENSOR_RGB_MAPTBL);
-	mutex_unlock(&mdnie->lock);
-	mdnie_update(mdnie);
-
-	return count;
-}
-
 struct device_attribute mdnie_dev_attrs[] = {
 	__PANEL_ATTR_RW(mode, 0664),
 	__PANEL_ATTR_RW(scenario, 0664),
@@ -1286,7 +1239,6 @@ struct device_attribute mdnie_dev_attrs[] = {
 #ifdef CONFIG_SUPPORT_AFC
 	__PANEL_ATTR_RW(afc, 0664),
 #endif
-	__PANEL_ATTR_RW(rgb, 0664),
 };
 
 int mdnie_enable(struct mdnie_info *mdnie)
